@@ -1,2 +1,6 @@
 streamlit
 requests
+pandas
+numpy
+yfinance
+settrade-v2

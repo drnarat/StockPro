@@ -1,6 +1,3 @@
-streamlit
-requests
-pandas
-numpy
-yfinance
 settrade-v2
+requests
+cryptography

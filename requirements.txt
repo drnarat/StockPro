@@ -1,3 +1,4 @@
 settrade-v2
-requests
-cryptography
+pandas
+pandas-ta
+google-generativeai

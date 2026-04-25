@@ -6,30 +6,30 @@ from settrade_v2 import Investor
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# --- UI: Sidebar สำหรับกรอก Configuration ---
+# --- UI: Sidebar สำหรับกรอกข้อมูลใหม่ทั้งหมด ---
 st.sidebar.header("🔑 Settrade API Configuration")
 
 with st.sidebar:
-    input_app_id = st.text_input("App ID", value="MPRZz1Hymo6nR50A")
-    input_app_secret = st.text_input("App Secret", value="Te/3LKXBb+IM20T/ygcFAMWXjIgkadJ+o1cDstkjRDQ=", type="password")
-    input_app_code = st.text_input("App Code", value="SANDBOX")
-    input_broker_id = st.text_input("Broker ID", value="SANDBOX")
-    input_account_no = st.text_input("Account No", value="Narats-E")
-    input_pin = st.text_input("PIN", value="111111", type="password")
-    input_is_sandbox = st.checkbox("Sandbox Mode", value=True)
+    # ลบค่า value ออกเพื่อให้เป็นช่องว่าง (Empty string)
+    input_app_id = st.text_input("App ID", value="")
+    input_app_secret = st.text_input("App Secret", value="", type="password")
+    input_app_code = st.text_input("App Code", value="", help="ใส่ 'SANDBOX' สำหรับระบบทดสอบ")
+    input_broker_id = st.text_input("Broker ID", value="")
+    input_account_no = st.text_input("Account No", value="")
+    input_pin = st.text_input("PIN", value="", type="password")
 
     connect_btn = st.button("Connect to Settrade")
 
-# --- Class สำหรับจัดการ Robot ---
+# --- Class สำหรับจัดการ Robot (v2 compatible) ---
 class SettradeRobot:
     def __init__(self, config):
         try:
+            # ใช้เฉพาะ 4 parameter หลักตามมาตรฐาน SDK v2
             self.investor = Investor(
                 app_id=config['app_id'],
                 app_secret=config['app_secret'],
                 app_code=config['app_code'],
-                broker_id=config['broker_id'],
-                is_sandbox=config['is_sandbox']
+                broker_id=config['broker_id']
             )
             self.equity = self.investor.Equity(account_no=config['account_no'])
             self.pin = config['pin']
@@ -48,25 +48,36 @@ class SettradeRobot:
 st.title("🤖 AI Trading Bot Dashboard")
 
 if connect_btn:
-    # รวบรวมค่าจาก Input มาใส่ใน Dictionary
-    current_config = {
-        "app_id": input_app_id,
-        "app_secret": input_app_secret,
-        "app_code": input_app_code,
-        "broker_id": input_broker_id,
-        "account_no": input_account_no,
-        "pin": input_pin,
-        "is_sandbox": input_is_sandbox
-    }
-    
-    # บันทึกลงใน Session State เพื่อให้ใช้งานได้ตลอดการรันแอป
-    st.session_state.bot = SettradeRobot(current_config)
+    # ตรวจสอบว่ากรอกข้อมูลครบหรือไม่
+    if not all([input_app_id, input_app_secret, input_app_code, input_broker_id, input_account_no, input_pin]):
+        st.warning("⚠️ กรุณากรอกข้อมูลให้ครบทุกช่อง")
+    else:
+        current_config = {
+            "app_id": input_app_id,
+            "app_secret": input_app_secret,
+            "app_code": input_app_code,
+            "broker_id": input_broker_id,
+            "account_no": input_account_no,
+            "pin": input_pin
+        }
+        
+        # เก็บใน Session State
+        st.session_state.bot = SettradeRobot(current_config)
 
-# ตรวจสอบว่ามีการเชื่อมต่อแล้วหรือไม่
+# ตรวจสอบสถานะการเชื่อมต่อ
 if "bot" in st.session_state:
-    if st.button("เช็คพอร์ตปัจจุบัน"):
-        port_data = st.session_state.bot.get_portfolio()
-        st.write("### ข้อมูลพอร์ตการลงทุน")
-        st.json(port_data)
+    st.write("---")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("📊 เช็คพอร์ตการลงทุน"):
+            port_data = st.session_state.bot.get_portfolio()
+            st.write("### ข้อมูลพอร์ต")
+            st.json(port_data)
+            
+    with col2:
+        if st.button("🔄 ล้างการเชื่อมต่อ"):
+            del st.session_state.bot
+            st.rerun()
 else:
-    st.info("กรุณากรอกข้อมูลที่แถบด้านข้างและกดปุ่ม Connect เพื่อเริ่มต้น")
+    st.info("💡 กรุณากรอกข้อมูล API Credentials ที่แถบด้านข้างเพื่อเริ่มต้นใช้งาน")

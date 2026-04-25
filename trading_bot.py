@@ -81,3 +81,28 @@ if "bot" in st.session_state:
             st.rerun()
 else:
     st.info("💡 กรุณากรอกข้อมูล API Credentials ที่แถบด้านข้างเพื่อเริ่มต้นใช้งาน")
+
+# เพิ่มส่วนนี้ต่อจากปุ่มเช็คพอร์ตในไฟล์ trading_bot.py
+
+if "bot" in st.session_state:
+    st.write("---")
+    st.subheader("🛒 ส่งคำสั่งซื้อขาย (Test Order)")
+    
+    with st.form("order_form"):
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            symbol = st.text_input("ชื่อหุ้น", value="PTT")
+        with col2:
+            side = st.selectbox("ฝั่ง", ["Buy", "Sell"])
+        with col3:
+            volume = st.number_input("จำนวนหุ้น", min_value=100, step=100, value=100)
+            
+        price = st.number_input("ราคาต่อหุ้น", min_value=0.0, step=0.25, value=35.00)
+        
+        submit_order = st.form_submit_with_button("ส่งคำสั่ง Order")
+
+        if submit_order:
+            order_res = st.session_state.bot.place_order(symbol, side, volume, price)
+            if order_res:
+                st.success(f"ส่งคำสั่ง {side} {symbol} เรียบร้อยแล้ว!")
+                st.json(order_res)

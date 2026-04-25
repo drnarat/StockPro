@@ -1,109 +1,32 @@
-import streamlit as st
-import pandas as pd
-import pandas_ta as ta
-import google.generativeai as genai
-from settrade_v2 import Investor
-
-# --- CONFIG AI ---
-# แนะนำให้ดร. นำ API Key ของ Gemini ไปใส่ใน Streamlit Secrets หรือ Sidebar
-# genai.configure(api_key="YOUR_GEMINI_API_KEY")
-
-st.set_page_config(layout="wide", page_title="AI Stock Scanner")
-
-# --- SIDEBAR: API CONFIG ---
-with st.sidebar:
-    st.header("🔑 API Settings")
-    input_app_id = st.text_input("App ID")
-    input_app_secret = st.text_input("App Secret", type="password")
-    gemini_key = st.text_input("Gemini API Key", type="password")
-    
-    st.subheader("⚙️ Indicator Tuning")
-    sma_fast = st.slider("SMA Fast", 5, 50, 20)
-    sma_slow = st.slider("SMA Slow", 20, 200, 50)
-    rsi_period = st.slider("RSI Period", 5, 30, 14)
-
-# --- ฟังก์ชันหลัก ---
-def init_settrade():
-    try:
-        investor = Investor(
-            app_id=input_app_id,
-            app_secret=input_app_secret,
-            app_code="SANDBOX", # หรือโปรดักชั่น
-            broker_id="SANDBOX"
-        )
-        return investor.MarketData()
-    except:
-        return None
-
-# --- UI TABS ---
-tab1, tab2 = st.tabs(["🔍 Market Scanner", "📈 AI Stock Insight"])
-
-# --- TAB 1: ระบบสแกนหุ้นทั้งตลาด ---
-with tab1:
-    st.header("Market-wide Technical Scan")
-    if st.button("🚀 Start Scanning SET"):
-        market = init_settrade()
-        if market:
-            with st.spinner("กำลังดึงข้อมูลและวิเคราะห์หุ้นทั้งตลาด..."):
-                # หมายเหตุ: ในการใช้จริงดร. ต้องดึงรายชื่อหุ้นจาก market.get_symbols() 
-                # ตัวอย่างนี้จำลองการสแกนหุ้นหลักๆ เพื่อประสิทธิภาพ
-                target_stocks = ["PTT", "CPALL", "AOT", "ADVANC", "KBANK", "SCB", "OR"]
-                scan_results = []
-
-                for symbol in target_stocks:
-                    # ดึงข้อมูลราคาย้อนหลัง 1 ปี
-                    res = market.get_candlestick(symbol, "1D", 250)
-                    df = pd.DataFrame(res)
-                    
-                    # คำนวณ Indicators ด้วย pandas-ta
-                    df['SMA_Fast'] = ta.sma(df['last'], length=sma_fast)
-                    df['SMA_Slow'] = ta.sma(df['last'], length=sma_slow)
-                    df['RSI'] = ta.rsi(df['last'], length=rsi_period)
-                    
-                    last_row = df.iloc[-1]
-                    
-                    # Logic วิเคราะห์เบื้องต้น
-                    signal = "Wait"
-                    if last_row['SMA_Fast'] > last_row['SMA_Slow'] and last_row['RSI'] < 70:
-                        signal = "Strong Buy (Golden Cross)"
-                    elif last_row['RSI'] < 30:
-                        signal = "Oversold (Possible Buy)"
-                    elif last_row['RSI'] > 70:
-                        signal = "Overbought (Caution)"
-
-                    scan_results.append({
-                        "Symbol": symbol,
-                        "Price": last_row['last'],
-                        "RSI": round(last_row['RSI'], 2),
-                        "Signal": signal
-                    })
-                
-                st.table(pd.DataFrame(scan_results))
-        else:
-            st.error("กรุณาเชื่อมต่อ API ก่อนครับ")
-
-# --- TAB 2: วิเคราะห์หุ้นรายตัวโดย Gemini ---
 with tab2:
-    st.header("Gemini AI Fundamental Analyst")
-    target_symbol = st.text_input("ระบุชื่อหุ้นที่ต้องการวิเคราะห์ (เช่น PTT)", "PTT")
+    st.header("🧠 30-Day Deep Insight AI (Gemini)")
+    stock_target = st.text_input("ระบุชื่อหุ้นที่ต้องการวิเคราะห์เชิงลึกล่าสุด", "PTT")
     
-    if st.button("🧠 Analyze with Gemini"):
-        if not gemini_key:
-            st.warning("กรุณาใส่ Gemini API Key ที่ Sidebar ครับ")
+    if st.button("🧠 Analyze Recent 1-Month"):
+        if not gemini_key: 
+            st.warning("กรุณาใส่ Gemini Key ใน Sidebar เพื่อเริ่มการวิเคราะห์ครับ")
         else:
             genai.configure(api_key=gemini_key)
-            model = genai.GenerativeModel('gemini-2.5-flash') # หรือเวอร์ชันล่าสุด
+            # ใช้รุ่น Pro สำหรับการวิเคราะห์ที่ต้องเจาะจง Timeline
+            model = genai.GenerativeModel('gemini-1.5-flash') 
             
-            with st.spinner(f"AI กำลังรวบรวมข้อมูล {target_symbol}..."):
-                # สร้าง Prompt ให้ Gemini วิเคราะห์
+            with st.spinner(f"AI กำลังเจาะลึกข้อมูลหุ้น {stock_target} ในรอบ 30 วันที่ผ่านมา..."):
                 prompt = f"""
-                ในฐานะนักวิเคราะห์หุ้นมืออาชีพ ช่วยสรุปข้อมูลหุ้น {target_symbol} ในตลาดหลักทรัพย์แห่งประเทศไทย:
-                1. อธิบายโมเดลธุรกิจสั้นๆ ให้เข้าใจง่าย
-                2. สรุปข่าวสำคัญหรือเหตุการณ์ในรอบ 1 ปีที่ผ่านมาที่มีผลต่อราคาหุ้น
-                3. วิเคราะห์ปัจจัยบวกและปัจจัยลบในปัจจุบัน
-                ตอบเป็นภาษาไทย และใช้รูปแบบที่อ่านง่าย (Bullet points)
+                ในฐานะนักวิเคราะห์กลยุทธ์หุ้น เจาะลึกหุ้น {stock_target} ในตลาด SET:
+                1. สรุปภาพรวมธุรกิจและ "จุดเด่น" ของหุ้นตัวนี้ (สั้นๆ 2-3 บรรทัด)
+                2. สรุปข่าวสารสำคัญ เหตุการณ์ หรือประกาศจาก ตลท. ที่เกิดขึ้นในรอบ "1 เดือนที่ผ่านมา" เท่านั้น
+                3. วิเคราะห์ Sentiment ของตลาดล่าสุดต่อหุ้นตัวนี้ (มีแรงซื้อสะสมหรือแรงเทขายเพราะข่าวอะไร?)
+                4. ปัจจัยบวก/ลบ ที่ต้องเฝ้าระวังเป็นพิเศษในอีก 1-2 สัปดาห์ข้างหน้า
+                
+                หมายเหตุ: หากเป็นข้อมูลข่าวสาร ให้เน้นความสดใหม่ในรอบ 30 วัน
+                ตอบเป็นภาษาไทย โดยใช้ Bullet points และจัดหัวข้อให้ชัดเจน
                 """
                 
                 response = model.generate_content(prompt)
-                st.markdown("### 📋 บทวิเคราะห์จาก AI")
-                st.write(response.text)
+                
+                # แสดงผลด้วย Markdown เพื่อความสวยงาม
+                st.info(f"💡 รายงานการวิเคราะห์หุ้น {stock_target} ประจำเดือนเมษายน 2026")
+                st.markdown(response.text)
+                
+                # คำเตือนเชิงกฎหมาย (Disclaimer)
+                st.caption("⚠️ หมายเหตุ: ข้อมูลนี้เป็นการรวบรวมและวิเคราะห์โดย AI เพื่อใช้ประกอบการตัดสินใจเบื้องต้นเท่านั้น ดร. ณรัตน์ โปรดตรวจสอบข้อมูลจากช่องทางทางการของ ตลท. อีกครั้งครับ")

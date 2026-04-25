@@ -1,116 +1,109 @@
 import streamlit as st
-import logging
+import pandas as pd
+import pandas_ta as ta
+import google.generativeai as genai
 from settrade_v2 import Investor
 
-# ตั้งค่า Logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# --- CONFIG AI ---
+# แนะนำให้ดร. นำ API Key ของ Gemini ไปใส่ใน Streamlit Secrets หรือ Sidebar
+# genai.configure(api_key="YOUR_GEMINI_API_KEY")
 
-# --- UI: Sidebar สำหรับกรอกข้อมูล ---
-st.sidebar.header("🔑 Settrade API Configuration")
+st.set_page_config(layout="wide", page_title="AI Stock Scanner")
 
+# --- SIDEBAR: API CONFIG ---
 with st.sidebar:
-    input_app_id = st.text_input("App ID", value="")
-    input_app_secret = st.text_input("App Secret", value="", type="password")
-    input_app_code = st.text_input("App Code", value="", help="ใส่ 'SANDBOX' สำหรับระบบทดสอบ")
-    input_broker_id = st.text_input("Broker ID", value="")
-    input_account_no = st.text_input("Account No", value="")
-    input_pin = st.text_input("PIN", value="", type="password")
-
-    connect_btn = st.sidebar.button("Connect to Settrade")
-
-# --- Class สำหรับจัดการ Robot ---
-class SettradeRobot:
-    def __init__(self, config):
-        try:
-            self.investor = Investor(
-                app_id=config['app_id'],
-                app_secret=config['app_secret'],
-                app_code=config['app_code'],
-                broker_id=config['broker_id']
-            )
-            self.equity = self.investor.Equity(account_no=config['account_no'])
-            self.pin = config['pin']
-            st.success(f"✅ เชื่อมต่อบัญชี {config['account_no']} สำเร็จ!")
-        except Exception as e:
-            st.error(f"❌ การเชื่อมต่อล้มเหลว: {e}")
-            raise
-
-    def get_portfolio(self):
-        try:
-            return self.equity.get_portfolios()
-        except Exception as e:
-            st.error(f"ไม่สามารถดึงข้อมูลพอร์ตได้: {e}")
-            return None
-
-    def place_order(self, symbol, side, volume, price):
-        try:
-            return self.equity.place_order(
-                symbol=symbol.upper(),
-                side=side,
-                volume=volume,
-                price=price,
-                pin=self.pin,
-                order_type="Limit"
-            )
-        except Exception as e:
-            st.error(f"❌ ส่งคำสั่งล้มเหลว: {e}")
-            return None
-
-# --- ส่วนแสดงผลหลัก ---
-st.title("🤖 AI Trading Bot Dashboard")
-
-if connect_btn:
-    if not all([input_app_id, input_app_secret, input_app_code, input_broker_id, input_account_no, input_pin]):
-        st.warning("⚠️ กรุณากรอกข้อมูลให้ครบทุกช่อง")
-    else:
-        current_config = {
-            "app_id": input_app_id,
-            "app_secret": input_app_secret,
-            "app_code": input_app_code,
-            "broker_id": input_broker_id,
-            "account_no": input_account_no,
-            "pin": input_pin
-        }
-        st.session_state.bot = SettradeRobot(current_config)
-
-# ตรวจสอบสถานะการเชื่อมต่อ
-if "bot" in st.session_state:
-    st.write("---")
+    st.header("🔑 API Settings")
+    input_app_id = st.text_input("App ID")
+    input_app_secret = st.text_input("App Secret", type="password")
+    gemini_key = st.text_input("Gemini API Key", type="password")
     
-    # ส่วนเช็คพอร์ต
-    if st.button("📊 เช็คพอร์ตการลงทุน"):
-        port_data = st.session_state.bot.get_portfolio()
-        if port_data:
-            st.write("### ข้อมูลพอร์ต")
-            st.json(port_data)
+    st.subheader("⚙️ Indicator Tuning")
+    sma_fast = st.slider("SMA Fast", 5, 50, 20)
+    sma_slow = st.slider("SMA Slow", 20, 200, 50)
+    rsi_period = st.slider("RSI Period", 5, 30, 14)
 
-    st.write("---")
-    st.subheader("🛒 ส่งคำสั่งซื้อขาย (Test Order)")
+# --- ฟังก์ชันหลัก ---
+def init_settrade():
+    try:
+        investor = Investor(
+            app_id=input_app_id,
+            app_secret=input_app_secret,
+            app_code="SANDBOX", # หรือโปรดักชั่น
+            broker_id="SANDBOX"
+        )
+        return investor.MarketData()
+    except:
+        return None
+
+# --- UI TABS ---
+tab1, tab2 = st.tabs(["🔍 Market Scanner", "📈 AI Stock Insight"])
+
+# --- TAB 1: ระบบสแกนหุ้นทั้งตลาด ---
+with tab1:
+    st.header("Market-wide Technical Scan")
+    if st.button("🚀 Start Scanning SET"):
+        market = init_settrade()
+        if market:
+            with st.spinner("กำลังดึงข้อมูลและวิเคราะห์หุ้นทั้งตลาด..."):
+                # หมายเหตุ: ในการใช้จริงดร. ต้องดึงรายชื่อหุ้นจาก market.get_symbols() 
+                # ตัวอย่างนี้จำลองการสแกนหุ้นหลักๆ เพื่อประสิทธิภาพ
+                target_stocks = ["PTT", "CPALL", "AOT", "ADVANC", "KBANK", "SCB", "OR"]
+                scan_results = []
+
+                for symbol in target_stocks:
+                    # ดึงข้อมูลราคาย้อนหลัง 1 ปี
+                    res = market.get_candlestick(symbol, "1D", 250)
+                    df = pd.DataFrame(res)
+                    
+                    # คำนวณ Indicators ด้วย pandas-ta
+                    df['SMA_Fast'] = ta.sma(df['last'], length=sma_fast)
+                    df['SMA_Slow'] = ta.sma(df['last'], length=sma_slow)
+                    df['RSI'] = ta.rsi(df['last'], length=rsi_period)
+                    
+                    last_row = df.iloc[-1]
+                    
+                    # Logic วิเคราะห์เบื้องต้น
+                    signal = "Wait"
+                    if last_row['SMA_Fast'] > last_row['SMA_Slow'] and last_row['RSI'] < 70:
+                        signal = "Strong Buy (Golden Cross)"
+                    elif last_row['RSI'] < 30:
+                        signal = "Oversold (Possible Buy)"
+                    elif last_row['RSI'] > 70:
+                        signal = "Overbought (Caution)"
+
+                    scan_results.append({
+                        "Symbol": symbol,
+                        "Price": last_row['last'],
+                        "RSI": round(last_row['RSI'], 2),
+                        "Signal": signal
+                    })
+                
+                st.table(pd.DataFrame(scan_results))
+        else:
+            st.error("กรุณาเชื่อมต่อ API ก่อนครับ")
+
+# --- TAB 2: วิเคราะห์หุ้นรายตัวโดย Gemini ---
+with tab2:
+    st.header("Gemini AI Fundamental Analyst")
+    target_symbol = st.text_input("ระบุชื่อหุ้นที่ต้องการวิเคราะห์ (เช่น PTT)", "PTT")
     
-    # ฟอร์มซื้อขาย (แก้ไขฟังก์ชันปุ่มแล้ว)
-    with st.form("order_form"):
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            symbol = st.text_input("ชื่อหุ้น", value="PTT")
-        with col2:
-            side = st.selectbox("ฝั่ง", ["Buy", "Sell"])
-        with col3:
-            volume = st.number_input("จำนวนหุ้น", min_value=100, step=100, value=100)
+    if st.button("🧠 Analyze with Gemini"):
+        if not gemini_key:
+            st.warning("กรุณาใส่ Gemini API Key ที่ Sidebar ครับ")
+        else:
+            genai.configure(api_key=gemini_key)
+            model = genai.GenerativeModel('gemini-2.5-flash') # หรือเวอร์ชันล่าสุด
             
-        price = st.number_input("ราคาต่อหุ้น", min_value=0.0, step=0.25, value=35.00)
-        
-        # ฟังก์ชันที่ถูกต้องคือ st.form_submit_button
-        submit_order = st.form_submit_button("ส่งคำสั่ง Order")
-
-        if submit_order:
-            order_res = st.session_state.bot.place_order(symbol, side, volume, price)
-            if order_res:
-                st.success(f"ส่งคำสั่ง {side} {symbol} เรียบร้อยแล้ว!")
-                st.json(order_res)
-
-    if st.button("🔄 ล้างการเชื่อมต่อ"):
-        del st.session_state.bot
-        st.rerun()
-else:
-    st.info("💡 กรุณากรอกข้อมูล API Credentials ที่แถบด้านข้างเพื่อเริ่มต้นใช้งาน")
+            with st.spinner(f"AI กำลังรวบรวมข้อมูล {target_symbol}..."):
+                # สร้าง Prompt ให้ Gemini วิเคราะห์
+                prompt = f"""
+                ในฐานะนักวิเคราะห์หุ้นมืออาชีพ ช่วยสรุปข้อมูลหุ้น {target_symbol} ในตลาดหลักทรัพย์แห่งประเทศไทย:
+                1. อธิบายโมเดลธุรกิจสั้นๆ ให้เข้าใจง่าย
+                2. สรุปข่าวสำคัญหรือเหตุการณ์ในรอบ 1 ปีที่ผ่านมาที่มีผลต่อราคาหุ้น
+                3. วิเคราะห์ปัจจัยบวกและปัจจัยลบในปัจจุบัน
+                ตอบเป็นภาษาไทย และใช้รูปแบบที่อ่านง่าย (Bullet points)
+                """
+                
+                response = model.generate_content(prompt)
+                st.markdown("### 📋 บทวิเคราะห์จาก AI")
+                st.write(response.text)

@@ -6,11 +6,10 @@ from settrade_v2 import Investor
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# --- UI: Sidebar สำหรับกรอกข้อมูลใหม่ทั้งหมด ---
+# --- UI: Sidebar สำหรับกรอกข้อมูล ---
 st.sidebar.header("🔑 Settrade API Configuration")
 
 with st.sidebar:
-    # ลบค่า value ออกเพื่อให้เป็นช่องว่าง (Empty string)
     input_app_id = st.text_input("App ID", value="")
     input_app_secret = st.text_input("App Secret", value="", type="password")
     input_app_code = st.text_input("App Code", value="", help="ใส่ 'SANDBOX' สำหรับระบบทดสอบ")
@@ -18,13 +17,12 @@ with st.sidebar:
     input_account_no = st.text_input("Account No", value="")
     input_pin = st.text_input("PIN", value="", type="password")
 
-    connect_btn = st.button("Connect to Settrade")
+    connect_btn = st.sidebar.button("Connect to Settrade")
 
-# --- Class สำหรับจัดการ Robot (v2 compatible) ---
+# --- Class สำหรับจัดการ Robot ---
 class SettradeRobot:
     def __init__(self, config):
         try:
-            # ใช้เฉพาะ 4 parameter หลักตามมาตรฐาน SDK v2
             self.investor = Investor(
                 app_id=config['app_id'],
                 app_secret=config['app_secret'],
@@ -43,12 +41,26 @@ class SettradeRobot:
             return self.equity.get_portfolios()
         except Exception as e:
             st.error(f"ไม่สามารถดึงข้อมูลพอร์ตได้: {e}")
+            return None
+
+    def place_order(self, symbol, side, volume, price):
+        try:
+            return self.equity.place_order(
+                symbol=symbol.upper(),
+                side=side,
+                volume=volume,
+                price=price,
+                pin=self.pin,
+                order_type="Limit"
+            )
+        except Exception as e:
+            st.error(f"❌ ส่งคำสั่งล้มเหลว: {e}")
+            return None
 
 # --- ส่วนแสดงผลหลัก ---
 st.title("🤖 AI Trading Bot Dashboard")
 
 if connect_btn:
-    # ตรวจสอบว่ากรอกข้อมูลครบหรือไม่
     if not all([input_app_id, input_app_secret, input_app_code, input_broker_id, input_account_no, input_pin]):
         st.warning("⚠️ กรุณากรอกข้อมูลให้ครบทุกช่อง")
     else:
@@ -60,34 +72,23 @@ if connect_btn:
             "account_no": input_account_no,
             "pin": input_pin
         }
-        
-        # เก็บใน Session State
         st.session_state.bot = SettradeRobot(current_config)
 
 # ตรวจสอบสถานะการเชื่อมต่อ
 if "bot" in st.session_state:
     st.write("---")
-    col1, col2 = st.columns(2)
     
-    with col1:
-        if st.button("📊 เช็คพอร์ตการลงทุน"):
-            port_data = st.session_state.bot.get_portfolio()
+    # ส่วนเช็คพอร์ต
+    if st.button("📊 เช็คพอร์ตการลงทุน"):
+        port_data = st.session_state.bot.get_portfolio()
+        if port_data:
             st.write("### ข้อมูลพอร์ต")
             st.json(port_data)
-            
-    with col2:
-        if st.button("🔄 ล้างการเชื่อมต่อ"):
-            del st.session_state.bot
-            st.rerun()
-else:
-    st.info("💡 กรุณากรอกข้อมูล API Credentials ที่แถบด้านข้างเพื่อเริ่มต้นใช้งาน")
 
-# เพิ่มส่วนนี้ต่อจากปุ่มเช็คพอร์ตในไฟล์ trading_bot.py
-
-if "bot" in st.session_state:
     st.write("---")
     st.subheader("🛒 ส่งคำสั่งซื้อขาย (Test Order)")
     
+    # ฟอร์มซื้อขาย (แก้ไขฟังก์ชันปุ่มแล้ว)
     with st.form("order_form"):
         col1, col2, col3 = st.columns(3)
         with col1:
@@ -99,10 +100,17 @@ if "bot" in st.session_state:
             
         price = st.number_input("ราคาต่อหุ้น", min_value=0.0, step=0.25, value=35.00)
         
-        submit_order = st.form_submit_with_button("ส่งคำสั่ง Order")
+        # ฟังก์ชันที่ถูกต้องคือ st.form_submit_button
+        submit_order = st.form_submit_button("ส่งคำสั่ง Order")
 
         if submit_order:
             order_res = st.session_state.bot.place_order(symbol, side, volume, price)
             if order_res:
                 st.success(f"ส่งคำสั่ง {side} {symbol} เรียบร้อยแล้ว!")
                 st.json(order_res)
+
+    if st.button("🔄 ล้างการเชื่อมต่อ"):
+        del st.session_state.bot
+        st.rerun()
+else:
+    st.info("💡 กรุณากรอกข้อมูล API Credentials ที่แถบด้านข้างเพื่อเริ่มต้นใช้งาน")

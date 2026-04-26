@@ -40,49 +40,182 @@ st.set_page_config(
 # ── CSS ──────────────────────────────────────────────────────
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap');
-html,body,[class*="css"]{font-family:'Sarabun',sans-serif;background:#07101f;color:#dce8f5}
-footer,#MainMenu,header{visibility:hidden}
-.stButton>button{background:linear-gradient(135deg,#059669,#047857);color:#fff;border:none;
-  border-radius:10px;padding:12px 20px;font-size:15px;font-weight:700;
-  font-family:'Sarabun',sans-serif;width:100%;transition:all .2s}
-.stButton>button:hover{opacity:.88;transform:translateY(-1px)}
-.stButton>button:disabled{opacity:.4}
-.stTextInput>div>div>input,.stSelectbox>div>div>select,.stNumberInput>div>div>input{
-  background:#0d1829;color:#dce8f5;border:1px solid #1c2e4a;border-radius:8px;
-  font-family:'Sarabun',sans-serif;font-size:15px}
-.stTabs [data-baseweb="tab-list"]{background:#0d1829;border-radius:10px;padding:4px;gap:2px}
-.stTabs [data-baseweb="tab"]{font-size:14px;font-weight:600;padding:10px 16px;
-  color:#5d7a9a;font-family:'Sarabun',sans-serif}
-.stTabs [aria-selected="true"]{background:#059669;color:#fff;border-radius:8px}
-div[data-testid="stExpander"]{background:#0d1829;border:1px solid #1c2e4a;border-radius:10px}
-div[data-testid="stMetric"]{background:#0d1829;border:1px solid #1c2e4a;border-radius:10px;padding:14px}
+@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap');
 
-.sc{background:#0d1829;border:1px solid #1c2e4a;border-radius:14px;padding:16px;margin-bottom:12px}
-.sc.buy  {border-left:4px solid #059669}
-.sc.sell {border-left:4px solid #dc2626}
-.sc.watch{border-left:4px solid #d97706}
-.mono{font-family:'IBM Plex Mono',monospace}
-.bull{color:#059669}.bear{color:#dc2626}.neut{color:#d97706}.dim{color:#5d7a9a}
-.px-xl{font-size:30px;font-weight:700;font-family:'IBM Plex Mono',monospace}
-.px-lg{font-size:22px;font-weight:700;font-family:'IBM Plex Mono',monospace}
-.sym-lg{font-size:20px;font-weight:700;font-family:'IBM Plex Mono',monospace}
-.ib{background:#07101f;border:1px solid #1c2e4a;border-radius:8px;padding:10px;text-align:center;margin-bottom:7px}
-.ib .lbl{font-size:11px;color:#5d7a9a;text-transform:uppercase;letter-spacing:.5px}
-.ib .val{font-size:18px;font-weight:700;font-family:'IBM Plex Mono',monospace;margin-top:3px}
-.ib .sig{font-size:11px;margin-top:2px}
-.tb{background:#07101f;border:1px solid #1c2e4a;border-radius:8px;padding:8px;text-align:center}
-.tb .lbl{font-size:10px;color:#5d7a9a;text-transform:uppercase}
-.tb .val{font-size:14px;font-weight:700;font-family:'IBM Plex Mono',monospace;margin-top:3px}
-.stag{display:inline-block;font-size:12px;padding:4px 10px;border-radius:20px;font-weight:600;margin:3px}
-.stag.b{background:rgba(5,150,105,.12);color:#059669;border:1px solid rgba(5,150,105,.3)}
-.stag.s{background:rgba(220,38,38,.12);color:#dc2626;border:1px solid rgba(220,38,38,.3)}
-.ring{width:68px;height:68px;border-radius:50%;display:flex;align-items:center;
-  justify-content:center;border:3px solid;font-size:22px;font-weight:700;
-  font-family:'IBM Plex Mono',monospace;flex-shrink:0}
-.ring.h{color:#059669;border-color:#059669;background:rgba(5,150,105,.1)}
-.ring.m{color:#d97706;border-color:#d97706;background:rgba(217,119,6,.1)}
-.ring.l{color:#dc2626;border-color:#dc2626;background:rgba(220,38,38,.1)}
+/* ── RESET & BASE ── */
+html, body, [class*="css"] {
+  font-family: 'Sarabun', sans-serif !important;
+  font-size: 16px !important;
+  color: #111827 !important;
+  background-color: #f8fafc !important;
+}
+footer, #MainMenu, header { visibility: hidden; }
+
+/* ── STREAMLIT OVERRIDES ── */
+.stApp { background-color: #f8fafc !important; }
+section[data-testid="stMain"] { background-color: #f8fafc !important; }
+
+/* ── BUTTONS ── */
+.stButton > button {
+  background: #059669 !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-radius: 10px !important;
+  padding: 14px 20px !important;
+  font-size: 16px !important;
+  font-weight: 700 !important;
+  font-family: 'Sarabun', sans-serif !important;
+  width: 100% !important;
+}
+.stButton > button:hover { background: #047857 !important; }
+.stButton > button:disabled { opacity: .4 !important; }
+
+/* ── INPUTS ── */
+input, textarea, select,
+.stTextInput input,
+.stSelectbox select,
+.stNumberInput input,
+div[data-baseweb="input"] input,
+div[data-baseweb="select"] input {
+  background: #ffffff !important;
+  color: #111827 !important;
+  border: 1.5px solid #d1d5db !important;
+  border-radius: 8px !important;
+  font-size: 16px !important;
+  font-family: 'Sarabun', sans-serif !important;
+  padding: 10px 14px !important;
+}
+div[data-baseweb="select"] > div {
+  background: #ffffff !important;
+  border: 1.5px solid #d1d5db !important;
+  color: #111827 !important;
+}
+div[data-baseweb="select"] span,
+div[data-baseweb="select"] div {
+  color: #111827 !important;
+}
+
+/* ── LABELS ── */
+label, .stTextInput label, .stSelectbox label,
+p, span, div {
+  color: #111827 !important;
+}
+
+/* ── TABS ── */
+.stTabs [data-baseweb="tab-list"] {
+  background: #e5e7eb !important;
+  border-radius: 10px !important;
+  padding: 4px !important;
+  gap: 2px !important;
+}
+.stTabs [data-baseweb="tab"] {
+  font-size: 15px !important;
+  font-weight: 600 !important;
+  padding: 10px 16px !important;
+  color: #6b7280 !important;
+  font-family: 'Sarabun', sans-serif !important;
+  border-radius: 8px !important;
+}
+.stTabs [aria-selected="true"] {
+  background: #059669 !important;
+  color: #ffffff !important;
+}
+
+/* ── EXPANDER ── */
+div[data-testid="stExpander"] {
+  background: #ffffff !important;
+  border: 1.5px solid #d1d5db !important;
+  border-radius: 12px !important;
+}
+div[data-testid="stExpander"] summary {
+  color: #111827 !important;
+  font-size: 15px !important;
+  font-weight: 600 !important;
+}
+
+/* ── METRIC ── */
+div[data-testid="stMetric"] {
+  background: #ffffff !important;
+  border: 1.5px solid #d1d5db !important;
+  border-radius: 10px !important;
+  padding: 14px !important;
+}
+div[data-testid="stMetric"] label { color: #6b7280 !important; font-size:13px !important; }
+div[data-testid="stMetric"] div[data-testid="stMetricValue"] { color: #111827 !important; font-size:22px !important; font-weight:700 !important; }
+
+/* ── SLIDER ── */
+div[data-testid="stSlider"] label { color: #111827 !important; font-size: 15px !important; }
+div[data-testid="stSlider"] div[data-testid="stTickBarMax"],
+div[data-testid="stSlider"] div[data-testid="stTickBarMin"] { color: #6b7280 !important; }
+
+/* ── RADIO ── */
+div[data-testid="stRadio"] label { color: #111827 !important; font-size: 15px !important; }
+div[data-testid="stRadio"] p { color: #111827 !important; }
+
+/* ── DATAFRAME ── */
+div[data-testid="stDataFrame"] { border: 1.5px solid #d1d5db !important; border-radius: 10px !important; }
+
+/* ── ALERTS ── */
+div[data-testid="stAlert"] p { color: inherit !important; }
+
+/* ── CUSTOM CARDS ── */
+.sc {
+  background: #ffffff;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.06);
+}
+.sc.buy  { border-left: 4px solid #059669; }
+.sc.sell { border-left: 4px solid #dc2626; }
+.sc.watch{ border-left: 4px solid #d97706; }
+
+.mono { font-family: 'IBM Plex Mono', monospace; }
+.bull { color: #059669 !important; }
+.bear { color: #dc2626 !important; }
+.neut { color: #d97706 !important; }
+.dim  { color: #6b7280 !important; }
+
+.px-xl { font-size: 30px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; }
+.px-lg { font-size: 22px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; }
+.sym-lg{ font-size: 20px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; }
+
+.ib {
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px;
+  text-align: center;
+  margin-bottom: 7px;
+}
+.ib .lbl { font-size: 11px; color: #6b7280; text-transform: uppercase; letter-spacing: .5px; }
+.ib .val { font-size: 18px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; margin-top: 3px; color: #111827; }
+.ib .sig { font-size: 11px; margin-top: 2px; }
+
+.tb {
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 8px;
+  text-align: center;
+}
+.tb .lbl { font-size: 10px; color: #6b7280; text-transform: uppercase; }
+.tb .val { font-size: 14px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; margin-top: 3px; }
+
+.stag { display: inline-block; font-size: 13px; padding: 5px 11px; border-radius: 20px; font-weight: 600; margin: 3px; }
+.stag.b { background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; }
+.stag.s { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+
+.ring {
+  width: 68px; height: 68px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  border: 3px solid; font-size: 22px; font-weight: 700;
+  font-family: 'IBM Plex Mono', monospace; flex-shrink: 0;
+}
+.ring.h { color: #059669; border-color: #059669; background: #d1fae5; }
+.ring.m { color: #b45309; border-color: #d97706; background: #fef3c7; }
+.ring.l { color: #dc2626; border-color: #dc2626; background: #fee2e2; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -439,9 +572,9 @@ for k,v in [("st_ok",False),("st_mkt",None),("st_rt",None),("st_inv",None),
 
 # ── Main header ───────────────────────────────────────────────
 st.markdown("""
-<div style="padding:18px 0 8px;text-align:center">
-  <div style="font-size:26px;font-weight:700">📈 Stock Pro</div>
-  <div style="font-size:13px;color:#5d7a9a;margin-top:4px">
+<div style="padding:18px 0 10px;text-align:center">
+  <div style="font-size:28px;font-weight:700;color:#111827">📈 Stock Pro</div>
+  <div style="font-size:14px;color:#6b7280;margin-top:5px">
     Settrade Real-time · SET50 · US Tech · CN Tech · AI วิเคราะห์
   </div>
 </div>
@@ -590,9 +723,9 @@ with t1:
                 <div class="sc {lc}">
                   <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
                     <div>
-                      <div class="sym-lg">{sym} <span style="font-size:13px;color:#5d7a9a;font-family:'Sarabun',sans-serif">{name}</span></div>
-                      <div style="margin-top:8px">{sig_ic(S['sig'])} <b style="color:#dce8f5">{sig_th(S['sig'])}</b>
-                        <span style="font-size:12px;color:#5d7a9a;margin-left:8px">R/R 1:{S['rr']}</span></div>
+                      <div class="sym-lg">{sym} <span style="font-size:13px;color:#6b7280;font-family:'Sarabun',sans-serif">{name}</span></div>
+                      <div style="margin-top:8px">{sig_ic(S['sig'])} <b style="color:#111827">{sig_th(S['sig'])}</b>
+                        <span style="font-size:12px;color:#6b7280;margin-left:8px">R/R 1:{S['rr']}</span></div>
                     </div>
                     <div style="text-align:right">
                       <div class="px-lg" style="color:{up_c}">{cur2}{fmt(I['price'])}</div>
@@ -673,16 +806,16 @@ with t2:
               <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
                 <div>
                   <div style="font-size:26px;font-weight:700;font-family:'IBM Plex Mono',monospace">{sym2}</div>
-                  <div style="font-size:13px;color:#5d7a9a;margin-top:3px">{name2} &middot; {mkt_in}</div>
-                  <div style="margin-top:10px">{sig_ic(S2['sig'])} <b style="font-size:16px;color:#dce8f5">{sig_th(S2['sig'])}</b></div>
-                  {('<div style="font-size:13px;color:#5d7a9a;margin-top:4px">Real-time: ฿'+fmt(float(q2.get("last",0)))+'</div>') if q2 else ""}
+                  <div style="font-size:13px;color:#6b7280;margin-top:3px">{name2} &middot; {mkt_in}</div>
+                  <div style="margin-top:10px">{sig_ic(S2['sig'])} <b style="font-size:16px;color:#111827">{sig_th(S2['sig'])}</b></div>
+                  {('<div style="font-size:13px;color:#6b7280;margin-top:4px">Real-time: ฿'+fmt(float(q2.get("last",0)))+'</div>') if q2 else ""}
                 </div>
                 <div class="ring {sc_cl(S2['sc'])}">{S2['sc']}</div>
               </div>
               <div class="px-xl" style="color:{up_c}">{cur2}{fmt(p2)}</div>
               <div style="font-size:15px;color:{up_c};font-weight:700;margin-top:5px">
                 {pstr(I2['chg'])} วันนี้
-                <span style="color:#5d7a9a;font-weight:400"> &nbsp; {pstr(I2['chg5'],1)} 5 วัน</span>
+                <span style="color:#6b7280;font-weight:400"> &nbsp; {pstr(I2['chg5'],1)} 5 วัน</span>
               </div>
             </div>
             """, unsafe_allow_html=True)
@@ -739,10 +872,10 @@ with t2:
 
             rr_c = "#059669" if S2["rr"]>=2 else "#d97706" if S2["rr"]>=1.5 else "#dc2626"
             st.markdown(f"""
-            <div style="background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.2);
+            <div style="background:#eff6ff;border:1px solid #bfdbfe;
               border-radius:10px;padding:12px 16px;margin-top:10px;
               display:flex;justify-content:space-between;align-items:center">
-              <span style="font-size:14px;color:#5d7a9a">Risk / Reward</span>
+              <span style="font-size:14px;color:#6b7280">Risk / Reward</span>
               <span style="font-size:22px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:{rr_c}">
                 1 : {S2['rr']}</span>
             </div>
@@ -766,9 +899,9 @@ with t2:
             # 52W
             st.markdown("#### 52-Week Range")
             st.markdown(f"""
-            <div style="display:flex;justify-content:space-between;font-size:12px;color:#5d7a9a;margin-bottom:5px">
+            <div style="display:flex;justify-content:space-between;font-size:12px;color:#6b7280;margin-bottom:5px">
               <span>Low {cur2}{fmt(I2['l52'])}</span>
-              <span style="color:#dce8f5;font-weight:700">{p52p:.0f}% จากต่ำสุด</span>
+              <span style="color:#111827;font-weight:700">{p52p:.0f}% จากต่ำสุด</span>
               <span>High {cur2}{fmt(I2['h52'])}</span>
             </div>
             """, unsafe_allow_html=True)
@@ -854,9 +987,9 @@ with t3:
               <div style="display:flex;justify-content:space-between;align-items:center">
                 <div>
                   <span style="font-size:18px;font-weight:700;font-family:'IBM Plex Mono',monospace">{sym3}</span>
-                  <span style="font-size:13px;color:#5d7a9a;margin-left:8px">{mkt3}</span>
-                  <div style="margin-top:6px">{sig_ic(sig3)} <b style="color:#dce8f5">{sig_th(sig3)}</b>
-                    <span style="font-size:12px;color:#5d7a9a;margin-left:8px">Score {sc3}</span></div>
+                  <span style="font-size:13px;color:#6b7280;margin-left:8px">{mkt3}</span>
+                  <div style="margin-top:6px">{sig_ic(sig3)} <b style="color:#111827">{sig_th(sig3)}</b>
+                    <span style="font-size:12px;color:#6b7280;margin-left:8px">Score {sc3}</span></div>
                 </div>
                 <div style="text-align:right">
                   <div style="font-size:22px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:{up_c3}">
@@ -864,10 +997,10 @@ with t3:
                   <div style="font-size:13px;color:{up_c3};font-weight:700">{pstr(chg3)}</div>
                 </div>
               </div>
-              <div style="background:#1c2e4a;border-radius:3px;height:4px;margin-top:10px">
+              <div style="background:#d1d5db;border-radius:3px;height:4px;margin-top:10px">
                 <div style="width:{sc3}%;height:4px;border-radius:3px;background:{sc_co(sc3)}"></div>
               </div>
-              <div style="font-size:12px;color:#5d7a9a;margin-top:5px">
+              <div style="font-size:12px;color:#6b7280;margin-top:5px">
                 RSI {rsi3:.0f} · {'EMA bullish' if e12_3>e26_3 else 'EMA bearish'} · {'เหนือ SMA20' if price3>s20_3 else 'ต่ำกว่า SMA20'}
               </div>
             </div>
@@ -935,6 +1068,6 @@ with t4:
 
 
 
-st.markdown('<div style="text-align:center;font-size:11px;color:#1c2e4a;margin-top:24px">'
+st.markdown('<div style="text-align:center;font-size:11px;color:#d1d5db;margin-top:24px">'
             'ใช้เพื่อการศึกษาเท่านั้น · ไม่ใช่คำแนะนำการลงทุน</div>',
             unsafe_allow_html=True)

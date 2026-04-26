@@ -9,7 +9,7 @@ import warnings
 warnings.filterwarnings('ignore')
 
 # --- 1. UI SETUP ---
-st.set_page_config(layout="wide", page_title="SRAN AI Stock Intelligence", page_icon="📈")
+st.set_page_config(layout="wide", page_title="SRAN AI Stock Platform", page_icon="📈")
 
 # --- 2. SIDEBAR ---
 with st.sidebar:
@@ -28,7 +28,7 @@ with st.sidebar:
     st.divider()
     gemini_key = st.text_input("Gemini API Key", type="password")
 
-# --- 3. ANALYTICS ENGINE (Index-Based Extraction) ---
+# --- 3. ANALYTICS ENGINE (Static Column Naming) ---
 class MasterEngine:
     def __init__(self, config):
         try:
@@ -39,44 +39,44 @@ class MasterEngine:
 
     def get_indicators(self, symbol):
         try:
-            # ดึงข้อมูลย้อนหลัง 350 วัน
             res = self.market.get_candlestick(symbol, "1D", 350)
             df = pd.DataFrame(res)
             if df.empty: return None
 
-            # [A] สร้าง DataFrame ใหม่เพื่อเก็บเฉพาะอินดิเคเตอร์ที่เราจะใช้
-            tech = pd.DataFrame(index=df.index)
-            tech['Price'] = df['last']
+            # สร้าง Dict เพื่อเก็บค่าอินดิเคเตอร์แบบเจาะจงชื่อ
+            stats = {}
+            stats['Price'] = df['last'].iloc[-1]
             
-            # [B] คำนวณทีละตัวและตั้งชื่อให้ "นิ่ง" (Fixed Names)
-            tech['SMA_Fast'] = ta.sma(df['last'], length=sma_f_len)
-            tech['SMA_Slow'] = ta.sma(df['last'], length=sma_s_len)
-            tech['EMA_20'] = ta.ema(df['last'], length=20)
-            tech['RSI'] = ta.rsi(df['last'], length=14)
+            # [A] Trend - คำนวณแล้วดึงค่าล่าสุดทันที
+            stats['SMA_Fast'] = ta.sma(df['last'], length=sma_f_len).iloc[-1]
+            stats['SMA_Slow'] = ta.sma(df['last'], length=sma_s_len).iloc[-1]
+            stats['EMA_20'] = ta.ema(df['last'], length=20).iloc[-1]
             
-            # MACD (ดึงจาก Series)
-            macd_raw = ta.macd(df['last'])
-            if macd_raw is not None:
-                tech['MACD'] = macd_raw.iloc[:, 0]
-                tech['MACD_Sig'] = macd_raw.iloc[:, 2]
+            # [B] Momentum
+            stats['RSI'] = ta.rsi(df['last'], length=14).iloc[-1]
             
-            # Stochastic
-            stoch_raw = ta.stoch(df['high'], df['low'], df['last'])
-            if stoch_raw is not None:
-                tech['Stoch_K'] = stoch_raw.iloc[:, 0]
-                tech['Stoch_D'] = stoch_raw.iloc[:, 1]
+            macd = ta.macd(df['last'])
+            if macd is not None:
+                stats['MACD'] = macd.iloc[-1, 0]
+                stats['MACD_Sig'] = macd.iloc[-1, 2]
             
-            # Bollinger Bands
-            bb_raw = ta.bbands(df['last'])
-            if bb_raw is not None:
-                tech['BB_Upper'] = bb_raw.iloc[:, 2]
-                tech['BB_Lower'] = bb_raw.iloc[:, 0]
+            stoch = ta.stoch(df['high'], df['low'], df['last'])
+            if stoch is not None:
+                stats['Stoch_K'] = stoch.iloc[-1, 0]
+                stats['Stoch_D'] = stoch.iloc[-1, 1]
+            
+            # [C] Volatility & Volume
+            bb = ta.bbands(df['last'])
+            if bb is not None:
+                stats['BB_Upper'] = bb.iloc[-1, 2]
+                stats['BB_Lower'] = bb.iloc[-1, 0]
                 
-            tech['ATR'] = ta.atr(df['high'], df['low'], df['last'], length=14)
-            tech['OBV'] = ta.obv(df['last'], df['volume'])
+            stats['ATR'] = ta.atr(df['high'], df['low'], df['last'], length=14).iloc[-1]
+            stats['OBV'] = ta.obv(df['last'], df['volume']).iloc[-1]
 
-            return tech.dropna(subset=['Price'])
-        except: return None
+            return stats
+        except Exception as e:
+            return None
 
 # --- 4. MAIN INTERFACE ---
 tab1, tab2, tab3 = st.tabs(["🔍 Global Scanner", "🧠 AI Deep Insight", "📊 Sentiment Gauge"])
@@ -85,42 +85,32 @@ with tab1:
     st.header(f"Multi-Indicator Scanner (Account: {c_account_no})")
     stocks_to_scan = ["PTT", "CPALL", "AOT", "ADVANC", "KBANK", "SCB", "OR", "GULF", "DELTA", "BANPU"]
     
-    if st.button("🚀 Start Deep Scan"):
+    if st.button("🚀 Start Full Arsenal Scan"):
         if not (c_app_id and c_app_secret):
-            st.warning("⚠️ กรุณากรอก API Credentials")
+            st.warning("⚠️ โปรดกรอก API Credentials")
         else:
             config = {'id': c_app_id, 'secret': c_app_secret, 'code': c_app_code, 'broker': c_broker_id}
             engine = MasterEngine(config)
             
             if engine.market:
-                with st.spinner("ประมวลผล 14 อินดิเคเตอร์เชิงลึก..."):
+                with st.spinner("ประมวลผลอินดิเคเตอร์ชุดใหญ่..."):
                     results = []
                     for s in stocks_to_scan:
-                        tech_df = engine.get_indicators(s)
-                        if tech_df is not None:
-                            last = tech_df.iloc[-1]
-                            
-                            # บังคับดึงค่าตามชื่อที่เราตั้งไว้ (Fixed Mapping)
-                            results.append({
-                                "Symbol": s,
-                                "Price": last['Price'],
-                                "SMA_Fast": round(last.get('SMA_Fast', 0), 2),
-                                "SMA_Slow": round(last.get('SMA_Slow', 0), 2),
-                                "EMA_20": round(last.get('EMA_20', 0), 2),
-                                "RSI": round(last.get('RSI', 0), 2),
-                                "MACD": round(last.get('MACD', 0), 3),
-                                "MACD_Sig": round(last.get('MACD_Sig', 0), 3),
-                                "Stoch_K": round(last.get('Stoch_K', 0), 2),
-                                "Stoch_D": round(last.get('Stoch_D', 0), 2),
-                                "BB_Upper": round(last.get('BB_Upper', 0), 2),
-                                "BB_Lower": round(last.get('BB_Lower', 0), 2),
-                                "ATR": round(last.get('ATR', 0), 3),
-                                "Volume(OBV)": f"{last.get('OBV', 0):,.0f}"
-                            })
+                        stats = engine.get_indicators(s)
+                        if stats:
+                            # บังคับโครงสร้างข้อมูลให้มีครบ 14 คอลัมน์
+                            row = {"Symbol": s}
+                            row.update({k: (round(v, 3) if isinstance(v, (int, float)) and not pd.isna(v) else v) for k, v in stats.items()})
+                            results.append(row)
                     
                     if results:
-                        st.dataframe(pd.DataFrame(results), use_container_width=True)
-                        st.success(f"✅ สำเร็จ: แสดงผลครบทั้ง {len(pd.DataFrame(results).columns)} คอลัมน์")
+                        final_df = pd.DataFrame(results)
+                        # จัดเรียงลำดับคอลัมน์ให้สวยงาม
+                        cols_order = ["Symbol", "Price", "SMA_Fast", "SMA_Slow", "EMA_20", "RSI", "MACD", "MACD_Sig", "Stoch_K", "Stoch_D", "BB_Upper", "BB_Lower", "ATR", "OBV"]
+                        final_df = final_df.reindex(columns=cols_order)
+                        
+                        st.dataframe(final_df, use_container_width=True)
+                        st.success(f"✅ สำเร็จ: แสดงผลครบทั้ง {len(final_df.columns)} คอลัมน์")
             else: st.error("เชื่อมต่อระบบ Settrade ล้มเหลว")
 
 with tab2:

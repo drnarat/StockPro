@@ -6,13 +6,13 @@ import plotly.graph_objects as go
 from settrade_v2 import Investor
 import warnings
 
-# ปิด Warning เพื่อความสะอาดของหน้าจอ
+# ปรับปรุงให้ระบบเสถียรและสะอาดที่สุด
 warnings.filterwarnings('ignore')
 
 # --- 1. CONFIGURATION ---
 st.set_page_config(layout="wide", page_title="SRAN AI Stock Platform", page_icon="📈")
 
-# --- 2. SIDEBAR: CREDENTIALS & PARAMETERS ---
+# --- 2. SIDEBAR ---
 with st.sidebar:
     st.header("🔑 Settrade Connectivity")
     c_app_id = st.text_input("APP_ID", placeholder="ระบุ APP_ID")
@@ -25,13 +25,12 @@ with st.sidebar:
     st.header("⚙️ Indicators Tuning")
     sma_f_len = st.slider("SMA Fast", 5, 50, 20)
     sma_s_len = st.slider("SMA Slow", 50, 200, 100)
-    rsi_len = st.slider("RSI Period", 5, 30, 14)
     
     st.divider()
     gemini_key = st.text_input("Gemini API Key", type="password")
 
-# --- 3. ANALYTICS ENGINE (Verified Logic) ---
-class MasterEngine:
+# --- 3. CORE ANALYTICS ENGINE ---
+class RobustEngine:
     def __init__(self, config):
         try:
             self.investor = Investor(app_id=config['id'], app_secret=config['secret'],
@@ -41,27 +40,28 @@ class MasterEngine:
 
     def get_indicators(self, symbol):
         try:
-            # ดึงข้อมูลย้อนหลัง 350 วัน เพื่อรองรับ SMA ระยะยาว
+            # ดึงข้อมูลย้อนหลัง 350 วัน
             res = self.market.get_candlestick(symbol, "1D", 350)
             df = pd.DataFrame(res)
             if df.empty: return None
 
-            # [A] คำนวณค่าเดี่ยว (กำหนดชื่อตายตัว)
+            # [TREND]
             df['SMA_F'] = ta.sma(df['last'], length=sma_f_len)
             df['SMA_S'] = ta.sma(df['last'], length=sma_s_len)
             df['EMA_20'] = ta.ema(df['last'], length=20)
-            df['RSI_V'] = ta.rsi(df['last'], length=rsi_len)
-            df['ATR_V'] = ta.atr(df['high'], df['low'], df['last'], length=14)
-            df['OBV_V'] = ta.obv(df['last'], df['volume'])
             
-            # [B] คำนวณค่ากลุ่ม (MACD, Stoch, BB)
+            # [MOMENTUM]
+            df['RSI_V'] = ta.rsi(df['last'], length=14)
             macd = ta.macd(df['last'])
             stoch = ta.stoch(df['high'], df['low'], df['last'])
+            
+            # [VOLATILITY & VOLUME]
             bb = ta.bbands(df['last'])
+            df['ATR_V'] = ta.atr(df['high'], df['low'], df['last'], length=14)
+            df['OBV_V'] = ta.obv(df['last'], df['volume'])
 
-            # รวมเข้า DataFrame หลัก
-            df_final = pd.concat([df, macd, stoch, bb], axis=1)
-            return df_final
+            # รวมผลลัพธ์
+            return pd.concat([df, macd, stoch, bb], axis=1)
         except: return None
 
 # --- 4. MAIN INTERFACE ---
@@ -70,70 +70,66 @@ tab1, tab2, tab3 = st.tabs(["🔍 Global Scanner", "🧠 AI Deep Analysis", "�
 with tab1:
     st.header(f"Multi-Indicator Scanner (Acc: {c_account_no})")
     
-    # รายชื่อหุ้นเป้าหมาย (ประกาศภายใน Tab เพื่อป้องกัน NameError)
-    stocks_list = ["PTT", "CPALL", "AOT", "ADVANC", "KBANK", "SCB", "OR", "GULF", "DELTA", "BANPU"]
+    # ประกาศรายชื่อหุ้นภายใน Tab
+    stocks_to_scan = ["PTT", "CPALL", "AOT", "ADVANC", "KBANK", "SCB", "OR", "GULF", "DELTA", "BANPU"]
     
-    if st.button("🚀 Start Comprehensive Scan"):
+    if st.button("🚀 Start Deep Scan"):
         if not (c_app_id and c_app_secret):
             st.warning("⚠️ กรุณากรอก APP_ID และ APP_SECRET")
         else:
             config = {'id': c_app_id, 'secret': c_app_secret, 'code': c_app_code, 'broker': c_broker_id}
-            engine = MasterEngine(config)
+            engine = RobustEngine(config)
             
             if engine.market:
-                with st.spinner("ประมวลผลอินดิเคเตอร์ชุดใหญ่ (14 ค่า)..."):
+                with st.spinner("คำนวณ 14 อินดิเคเตอร์เชิงลึก..."):
                     scan_results = []
                     
-                    for s in stocks_list:
+                    for s in stocks_to_scan:
                         df = engine.get_indicators(s)
                         if df is not None:
-                            last_row = df.iloc[-1]
+                            last = df.iloc[-1]
                             
-                            # 💡 หัวใจสำคัญ: ระบบ Keyword Mapping (Wildcard)
-                            # ช่วยหาคอลัมน์ที่ชื่อเปลี่ยนไปตามค่า Slider
-                            def map_val(keyword):
-                                matched_cols = [c for c in df.columns if keyword in str(c)]
-                                if matched_cols:
-                                    val = last_row[matched_cols[0]]
+                            # ฟังก์ชันหาค่าจาก Column Name ที่ชื่อไม่คงที่
+                            def get_indicator_val(keyword):
+                                cols = [c for c in df.columns if keyword in str(c)]
+                                if cols:
+                                    val = last[cols[0]]
                                     return round(val, 3) if not pd.isna(val) else "N/A"
                                 return "N/A"
 
-                            # บังคับสร้างรายการที่มีครบ 14 อินดิเคเตอร์
+                            # สร้างแถวข้อมูลแบบมาตรฐาน (Standard Dictionary)
                             scan_results.append({
                                 "Symbol": s,
-                                "Price": last_row['last'],
-                                "SMA_Fast": map_val('SMA_F'),
-                                "SMA_Slow": map_val('SMA_S'),
-                                "EMA_20": map_row := map_val('EMA_20'),
-                                "RSI": map_val('RSI_V'),
-                                "MACD": map_val('MACD_'),
-                                "MACD_Sig": map_val('MACDs_'),
-                                "Stoch_K": map_val('STOCHk_'),
-                                "Stoch_D": map_val('STOCHd_'),
-                                "BB_Upper": map_val('BBU_'),
-                                "BB_Lower": map_val('BBL_'),
-                                "ATR": map_val('ATR_V'),
-                                "Volume(OBV)": f"{last_row.get('OBV_V', 0):,.0f}"
+                                "Price": last['last'],
+                                "SMA_Fast": get_indicator_val('SMA_F'),
+                                "SMA_Slow": get_indicator_val('SMA_S'),
+                                "EMA_20": get_indicator_val('EMA_20'),
+                                "RSI": get_indicator_val('RSI_V'),
+                                "MACD": get_indicator_val('MACD_'),
+                                "MACD_Sig": get_indicator_val('MACDs_'),
+                                "Stoch_K": get_indicator_val('STOCHk_'),
+                                "Stoch_D": get_indicator_val('STOCHd_'),
+                                "BB_Upper": get_indicator_val('BBU_'),
+                                "BB_Lower": get_indicator_val('BBL_'),
+                                "ATR": get_indicator_val('ATR_V'),
+                                "Volume(OBV)": f"{last.get('OBV_V', 0):,.0f}"
                             })
                     
                     if scan_results:
-                        display_df = pd.DataFrame(scan_results)
-                        st.dataframe(display_df, use_container_width=True)
-                        st.success(f"✅ สำเร็จ: แสดงผลครบทั้ง {len(display_df.columns)} คอลัมน์")
+                        st.dataframe(pd.DataFrame(scan_results), use_container_width=True)
+                        st.success(f"✅ ประมวลผลสำเร็จ: ตรวจพบ {len(pd.DataFrame(scan_results).columns)} คอลัมน์")
                     else:
-                        st.error("ไม่พบข้อมูล (โปรดตรวจสอบสิทธิ์ API หรือข้อมูลใน Sandbox)")
+                        st.error("ไม่พบข้อมูลหลักทรัพย์")
             else:
                 st.error("เชื่อมต่อระบบ Settrade ล้มเหลว")
 
-# [Tab 2 & 3 คงที่เพื่อความเสถียร]
 with tab2:
     st.header("Gemini AI Strategy Advisor")
-    target_stock = st.text_input("ระบุชื่อหุ้น", "PTT")
+    target_stock = st.text_input("ชื่อหุ้น", "PTT")
     if st.button("🧠 Analyze Stock"):
         if gemini_key:
             try:
                 genai.configure(api_key=gemini_key)
-                # ค้นหารุ่นที่รองรับอัตโนมัติ
                 models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
                 sel_model = "gemini-1.5-flash" if "models/gemini-1.5-flash" in models else "gemini-pro"
                 model = genai.GenerativeModel(sel_model)
@@ -142,6 +138,6 @@ with tab2:
             except Exception as e: st.error(f"AI Error: {e}")
 
 with tab3:
-    st.header("Market Sentiment Gauge")
+    st.header("Fear & Greed Index")
     fig = go.Figure(go.Indicator(mode="gauge+number", value=65))
     st.plotly_chart(fig, use_container_width=True)

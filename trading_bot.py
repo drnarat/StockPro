@@ -6,7 +6,7 @@ import plotly.graph_objects as go
 from settrade_v2 import Investor
 import warnings
 
-# ปรับปรุงให้ระบบเสถียรและสะอาดที่สุด
+# ปิด Warning เพื่อความสะอาดของหน้าจอ
 warnings.filterwarnings('ignore')
 
 # --- 1. CONFIGURATION ---
@@ -29,8 +29,8 @@ with st.sidebar:
     st.divider()
     gemini_key = st.text_input("Gemini API Key", type="password")
 
-# --- 3. CORE ANALYTICS ENGINE ---
-class RobustEngine:
+# --- 3. ANALYTICS ENGINE ---
+class MasterEngine:
     def __init__(self, config):
         try:
             self.investor = Investor(app_id=config['id'], app_secret=config['secret'],
@@ -40,27 +40,27 @@ class RobustEngine:
 
     def get_indicators(self, symbol):
         try:
-            # ดึงข้อมูลย้อนหลัง 350 วัน
+            # ดึงข้อมูลย้อนหลัง 350 วัน เพื่อรองรับ SMA ระยะยาว
             res = self.market.get_candlestick(symbol, "1D", 350)
             df = pd.DataFrame(res)
             if df.empty: return None
 
-            # [TREND]
+            # [A] Trend Indicators
             df['SMA_F'] = ta.sma(df['last'], length=sma_f_len)
             df['SMA_S'] = ta.sma(df['last'], length=sma_s_len)
             df['EMA_20'] = ta.ema(df['last'], length=20)
             
-            # [MOMENTUM]
+            # [B] Momentum
             df['RSI_V'] = ta.rsi(df['last'], length=14)
             macd = ta.macd(df['last'])
             stoch = ta.stoch(df['high'], df['low'], df['last'])
             
-            # [VOLATILITY & VOLUME]
+            # [C] Volatility & Volume
             bb = ta.bbands(df['last'])
             df['ATR_V'] = ta.atr(df['high'], df['low'], df['last'], length=14)
             df['OBV_V'] = ta.obv(df['last'], df['volume'])
 
-            # รวมผลลัพธ์
+            # รวมผลลัพธ์เข้าด้วยกัน
             return pd.concat([df, macd, stoch, bb], axis=1)
         except: return None
 
@@ -68,20 +68,20 @@ class RobustEngine:
 tab1, tab2, tab3 = st.tabs(["🔍 Global Scanner", "🧠 AI Deep Analysis", "📊 Sentiment Gauge"])
 
 with tab1:
-    st.header(f"Multi-Indicator Scanner (Acc: {c_account_no})")
+    st.header(f"Multi-Indicator Scanner (Account: {c_account_no})")
     
-    # ประกาศรายชื่อหุ้นภายใน Tab
+    # รายชื่อหุ้นเป้าหมาย
     stocks_to_scan = ["PTT", "CPALL", "AOT", "ADVANC", "KBANK", "SCB", "OR", "GULF", "DELTA", "BANPU"]
     
     if st.button("🚀 Start Deep Scan"):
         if not (c_app_id and c_app_secret):
-            st.warning("⚠️ กรุณากรอก APP_ID และ APP_SECRET")
+            st.warning("⚠️ โปรดกรอก APP_ID และ APP_SECRET")
         else:
             config = {'id': c_app_id, 'secret': c_app_secret, 'code': c_app_code, 'broker': c_broker_id}
-            engine = RobustEngine(config)
+            engine = MasterEngine(config)
             
             if engine.market:
-                with st.spinner("คำนวณ 14 อินดิเคเตอร์เชิงลึก..."):
+                with st.spinner("คำนวณอินดิเคเตอร์ 14 ตัว..."):
                     scan_results = []
                     
                     for s in stocks_to_scan:
@@ -89,29 +89,29 @@ with tab1:
                         if df is not None:
                             last = df.iloc[-1]
                             
-                            # ฟังก์ชันหาค่าจาก Column Name ที่ชื่อไม่คงที่
-                            def get_indicator_val(keyword):
+                            # 💡 หัวใจสำคัญ: ฟังก์ชันช่วยหาค่าจาก Column Name ที่ชื่อไม่คงที่
+                            def get_v(keyword):
                                 cols = [c for c in df.columns if keyword in str(c)]
                                 if cols:
                                     val = last[cols[0]]
                                     return round(val, 3) if not pd.isna(val) else "N/A"
                                 return "N/A"
 
-                            # สร้างแถวข้อมูลแบบมาตรฐาน (Standard Dictionary)
+                            # บังคับสร้าง Dictionary ที่มีครบทุกค่า (14 คอลัมน์)
                             scan_results.append({
                                 "Symbol": s,
                                 "Price": last['last'],
-                                "SMA_Fast": get_indicator_val('SMA_F'),
-                                "SMA_Slow": get_indicator_val('SMA_S'),
-                                "EMA_20": get_indicator_val('EMA_20'),
-                                "RSI": get_indicator_val('RSI_V'),
-                                "MACD": get_indicator_val('MACD_'),
-                                "MACD_Sig": get_indicator_val('MACDs_'),
-                                "Stoch_K": get_indicator_val('STOCHk_'),
-                                "Stoch_D": get_indicator_val('STOCHd_'),
-                                "BB_Upper": get_indicator_val('BBU_'),
-                                "BB_Lower": get_indicator_val('BBL_'),
-                                "ATR": get_indicator_val('ATR_V'),
+                                "SMA_Fast": get_v('SMA_F'),
+                                "SMA_Slow": get_v('SMA_S'),
+                                "EMA_20": get_v('EMA_20'),
+                                "RSI": get_v('RSI_V'),
+                                "MACD": get_v('MACD_'),
+                                "MACD_Sig": get_v('MACDs_'),
+                                "Stoch_K": get_v('STOCHk_'),
+                                "Stoch_D": get_v('STOCHd_'),
+                                "BB_Upper": get_v('BBU_'),
+                                "BB_Lower": get_v('BBL_'),
+                                "ATR": get_v('ATR_V'),
                                 "Volume(OBV)": f"{last.get('OBV_V', 0):,.0f}"
                             })
                     
@@ -123,6 +123,7 @@ with tab1:
             else:
                 st.error("เชื่อมต่อระบบ Settrade ล้มเหลว")
 
+# [Tab 2 & 3: ปลอดภัยจาก NotFound และ Error]
 with tab2:
     st.header("Gemini AI Strategy Advisor")
     target_stock = st.text_input("ชื่อหุ้น", "PTT")
@@ -138,6 +139,6 @@ with tab2:
             except Exception as e: st.error(f"AI Error: {e}")
 
 with tab3:
-    st.header("Fear & Greed Index")
+    st.header("Market Sentiment Index")
     fig = go.Figure(go.Indicator(mode="gauge+number", value=65))
     st.plotly_chart(fig, use_container_width=True)

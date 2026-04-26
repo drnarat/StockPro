@@ -448,19 +448,30 @@ def score(I, os=35, ob=65):
 
 # ── Settrade helpers ──────────────────────────────────────────
 def st_candles(sym, mkt_api, limit=365):
+    """ดึง OHLCV รายวัน รองรับทุก method ของ settrade-v2 Equity()"""
     try:
+        from datetime import datetime, timedelta
         data = None
-        # Equity API (version ใหม่): get_candlestick / get_price_chart_by_period
-        if hasattr(mkt_api, 'get_candlestick'):
-            data = mkt_api.get_candlestick(sym, interval="1d", limit=limit)
-        elif hasattr(mkt_api, 'get_price_chart_by_period'):
-            data = mkt_api.get_price_chart_by_period(sym, "1D")
-        elif hasattr(mkt_api, 'get_quotation_range'):
-            # บาง version ใช้ get_quotation_range
-            from datetime import datetime, timedelta
-            end_dt   = datetime.now().strftime("%Y-%m-%d")
-            start_dt = (datetime.now() - timedelta(days=limit)).strftime("%Y-%m-%d")
-            data = mkt_api.get_quotation_range(sym, start_dt, end_dt)
+        end_dt   = datetime.now().strftime("%Y-%m-%d")
+        start_dt = (datetime.now() - timedelta(days=limit)).strftime("%Y-%m-%d")
+
+        # รายการ method ทั้งหมดที่ Equity() อาจมี ลองตามลำดับ
+        attempts = [
+            ('get_candlestick',            lambda: mkt_api.get_candlestick(sym, interval="1d", limit=limit)),
+            ('get_price_chart_by_period',   lambda: mkt_api.get_price_chart_by_period(sym, "1D")),
+            ('get_quotation_range',         lambda: mkt_api.get_quotation_range(sym, start_dt, end_dt)),
+            ('get_historical_price',        lambda: mkt_api.get_historical_price(sym, start_dt, end_dt)),
+            ('get_price',                   lambda: mkt_api.get_price(sym)),
+        ]
+        for method_name, call in attempts:
+            if hasattr(mkt_api, method_name):
+                try:
+                    data = call()
+                    if data:
+                        break
+                except Exception:
+                    pass
+
         if not data: return None
         df = pd.DataFrame(data)
         rename = {}
@@ -774,30 +785,26 @@ with st.expander("⚙️ ตั้งค่า API Keys & Settrade", expanded=no
                             app_code=_app_code.strip(),
                             broker_id=_broker_id.strip(),
                         )
-                        # settrade-v2 API — try multiple method styles
+                        # settrade-v2 API — ใช้ตาม attributes จริงที่ตรวจพบ
+                        # ['Equity','MarketData','RealtimeDataConnection','Derivatives',...]
                         mkt_api = None
                         rt_api  = None
-                        # Style 1: new API (most common in recent versions)
-                        if hasattr(inv, 'market'):
-                            mkt_api = inv.market
-                            rt_api  = inv.realtime if hasattr(inv, 'realtime') else None
-                        # Style 2: callable Market() / Realtime()
-                        elif hasattr(inv, 'Market') and callable(inv.Market):
-                            try:
-                                mkt_api = inv.Market()
-                                rt_api  = inv.Realtime() if hasattr(inv, 'Realtime') else None
-                            except TypeError:
-                                mkt_api = inv.Market
-                                rt_api  = inv.Realtime if hasattr(inv, 'Realtime') else None
-                        # Style 3: direct attribute
-                        elif hasattr(inv, 'Market'):
-                            mkt_api = inv.Market
-                            rt_api  = inv.Realtime if hasattr(inv, 'Realtime') else None
-                        # Style 4: EquityMarket (some versions)
-                        elif hasattr(inv, 'EquityMarket'):
-                            mkt_api = inv.EquityMarket()
-                            rt_api  = None
 
+                        if hasattr(inv, 'Equity'):
+                            mkt_api = inv.Equity()
+                        elif hasattr(inv, 'MarketData'):
+                            mkt_api = inv.MarketData()
+                        elif hasattr(inv, 'Market'):
+                            mkt_api = inv.Market()
+                        elif hasattr(inv, 'market'):
+                            mkt_api = inv.market
+
+                        if hasattr(inv, 'RealtimeDataConnection'):
+                            rt_api = inv.RealtimeDataConnection()
+                        elif hasattr(inv, 'Realtime'):
+                            rt_api = inv.Realtime()
+                        elif hasattr(inv, 'realtime'):
+                            rt_api = inv.realtime
                         if mkt_api is None:
                             avail = [a for a in dir(inv) if not a.startswith('_')]
                             raise AttributeError(

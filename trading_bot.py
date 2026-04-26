@@ -9,12 +9,12 @@ import warnings
 warnings.filterwarnings('ignore')
 
 # --- 1. UI SETUP ---
-st.set_page_config(layout="wide", page_title="SRAN AI Stock Platform", page_icon="📈")
+st.set_page_config(layout="wide", page_title="SRAN AI Stock Intelligence", page_icon="📈")
 
 # --- 2. SIDEBAR ---
 with st.sidebar:
     st.header("🔑 Settrade Connectivity")
-    c_app_id = st.text_input("APP_ID")
+    c_app_id = st.text_input("APP_ID", placeholder="ระบุ APP_ID")
     c_app_secret = st.text_input("APP_SECRET", type="password")
     c_app_code = st.text_input("APP_CODE", value="SANDBOX")
     c_broker_id = st.text_input("BROKER_ID", value="SANDBOX")
@@ -28,7 +28,7 @@ with st.sidebar:
     st.divider()
     gemini_key = st.text_input("Gemini API Key", type="password")
 
-# --- 3. ANALYTICS ENGINE (Force Rename Logic) ---
+# --- 3. ANALYTICS ENGINE (Index-Based Extraction) ---
 class MasterEngine:
     def __init__(self, config):
         try:
@@ -39,38 +39,43 @@ class MasterEngine:
 
     def get_indicators(self, symbol):
         try:
+            # ดึงข้อมูลย้อนหลัง 350 วัน
             res = self.market.get_candlestick(symbol, "1D", 350)
             df = pd.DataFrame(res)
             if df.empty: return None
 
-            # [A] Trend
-            df['SMA_F'] = ta.sma(df['last'], length=sma_f_len)
-            df['SMA_S'] = ta.sma(df['last'], length=sma_s_len)
-            df['EMA_20'] = ta.ema(df['last'], length=20)
+            # [A] สร้าง DataFrame ใหม่เพื่อเก็บเฉพาะอินดิเคเตอร์ที่เราจะใช้
+            tech = pd.DataFrame(index=df.index)
+            tech['Price'] = df['last']
             
-            # [B] Momentum (Force Rename คอลัมน์ที่ชื่อไม่นิ่ง)
-            df['RSI_V'] = ta.rsi(df['last'], length=14)
+            # [B] คำนวณทีละตัวและตั้งชื่อให้ "นิ่ง" (Fixed Names)
+            tech['SMA_Fast'] = ta.sma(df['last'], length=sma_f_len)
+            tech['SMA_Slow'] = ta.sma(df['last'], length=sma_s_len)
+            tech['EMA_20'] = ta.ema(df['last'], length=20)
+            tech['RSI'] = ta.rsi(df['last'], length=14)
             
-            macd_df = ta.macd(df['last'])
-            if macd_df is not None:
-                df['MACD_V'] = macd_df.iloc[:, 0]  # ดึงคอลัมน์แรก (MACD line)
-                df['MACD_S'] = macd_df.iloc[:, 2]  # ดึงคอลัมน์สาม (Signal line)
+            # MACD (ดึงจาก Series)
+            macd_raw = ta.macd(df['last'])
+            if macd_raw is not None:
+                tech['MACD'] = macd_raw.iloc[:, 0]
+                tech['MACD_Sig'] = macd_raw.iloc[:, 2]
             
-            stoch_df = ta.stoch(df['high'], df['low'], df['last'])
-            if stoch_df is not None:
-                df['STOCH_K'] = stoch_df.iloc[:, 0]
-                df['STOCH_D'] = stoch_df.iloc[:, 1]
+            # Stochastic
+            stoch_raw = ta.stoch(df['high'], df['low'], df['last'])
+            if stoch_raw is not None:
+                tech['Stoch_K'] = stoch_raw.iloc[:, 0]
+                tech['Stoch_D'] = stoch_raw.iloc[:, 1]
             
-            # [C] Volatility & Volume
-            bb_df = ta.bbands(df['last'])
-            if bb_df is not None:
-                df['BB_UP'] = bb_df.iloc[:, 2] # Upper band
-                df['BB_LOW'] = bb_df.iloc[:, 0] # Lower band
+            # Bollinger Bands
+            bb_raw = ta.bbands(df['last'])
+            if bb_raw is not None:
+                tech['BB_Upper'] = bb_raw.iloc[:, 2]
+                tech['BB_Lower'] = bb_raw.iloc[:, 0]
                 
-            df['ATR_V'] = ta.atr(df['high'], df['low'], df['last'], length=14)
-            df['OBV_V'] = ta.obv(df['last'], df['volume'])
+            tech['ATR'] = ta.atr(df['high'], df['low'], df['last'], length=14)
+            tech['OBV'] = ta.obv(df['last'], df['volume'])
 
-            return df
+            return tech.dropna(subset=['Price'])
         except: return None
 
 # --- 4. MAIN INTERFACE ---
@@ -80,9 +85,9 @@ with tab1:
     st.header(f"Multi-Indicator Scanner (Account: {c_account_no})")
     stocks_to_scan = ["PTT", "CPALL", "AOT", "ADVANC", "KBANK", "SCB", "OR", "GULF", "DELTA", "BANPU"]
     
-    if st.button("🚀 Start Full Arsenal Scan"):
+    if st.button("🚀 Start Deep Scan"):
         if not (c_app_id and c_app_secret):
-            st.warning("⚠️ โปรดกรอก API Credentials")
+            st.warning("⚠️ กรุณากรอก API Credentials")
         else:
             config = {'id': c_app_id, 'secret': c_app_secret, 'code': c_app_code, 'broker': c_broker_id}
             engine = MasterEngine(config)
@@ -91,26 +96,26 @@ with tab1:
                 with st.spinner("ประมวลผล 14 อินดิเคเตอร์เชิงลึก..."):
                     results = []
                     for s in stocks_to_scan:
-                        df = engine.get_indicators(s)
-                        if df is not None:
-                            last = df.iloc[-1]
+                        tech_df = engine.get_indicators(s)
+                        if tech_df is not None:
+                            last = tech_df.iloc[-1]
                             
-                            # บังคับสร้างรายการที่มีครบ 14 อินดิเคเตอร์ โดยดึงจากชื่อที่เรา Rename ไว้
+                            # บังคับดึงค่าตามชื่อที่เราตั้งไว้ (Fixed Mapping)
                             results.append({
                                 "Symbol": s,
-                                "Price": last['last'],
-                                "SMA_Fast": round(last.get('SMA_F', 0), 2) if not pd.isna(last.get('SMA_F')) else "N/A",
-                                "SMA_Slow": round(last.get('SMA_S', 0), 2) if not pd.isna(last.get('SMA_S')) else "N/A",
+                                "Price": last['Price'],
+                                "SMA_Fast": round(last.get('SMA_Fast', 0), 2),
+                                "SMA_Slow": round(last.get('SMA_Slow', 0), 2),
                                 "EMA_20": round(last.get('EMA_20', 0), 2),
-                                "RSI": round(last.get('RSI_V', 0), 2),
-                                "MACD": round(last.get('MACD_V', 0), 3),
-                                "MACD_Sig": round(last.get('MAC_S', 0), 3), # แก้ไขชื่อ key ให้ตรง
-                                "Stoch_K": round(last.get('STOCH_K', 0), 2),
-                                "Stoch_D": round(last.get('STOCH_D', 0), 2),
-                                "BB_Upper": round(last.get('BB_UP', 0), 2),
-                                "BB_Lower": round(last.get('BB_LOW', 0), 2),
-                                "ATR": round(last.get('ATR_V', 0), 3),
-                                "Volume(OBV)": f"{last.get('OBV_V', 0):,.0f}"
+                                "RSI": round(last.get('RSI', 0), 2),
+                                "MACD": round(last.get('MACD', 0), 3),
+                                "MACD_Sig": round(last.get('MACD_Sig', 0), 3),
+                                "Stoch_K": round(last.get('Stoch_K', 0), 2),
+                                "Stoch_D": round(last.get('Stoch_D', 0), 2),
+                                "BB_Upper": round(last.get('BB_Upper', 0), 2),
+                                "BB_Lower": round(last.get('BB_Lower', 0), 2),
+                                "ATR": round(last.get('ATR', 0), 3),
+                                "Volume(OBV)": f"{last.get('OBV', 0):,.0f}"
                             })
                     
                     if results:

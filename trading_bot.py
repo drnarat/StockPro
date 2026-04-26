@@ -40,182 +40,258 @@ st.set_page_config(
 # ── CSS ──────────────────────────────────────────────────────
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
-/* ── RESET & BASE ── */
+/* ━━━━ BASE ━━━━ */
 html, body, [class*="css"] {
-  font-family: 'Sarabun', sans-serif !important;
-  font-size: 16px !important;
-  color: #111827 !important;
-  background-color: #f8fafc !important;
+  font-family: 'Prompt', sans-serif !important;
+  font-size: 15px !important;
+  color: #0f172a !important;
+  background: #f0f4ff !important;
 }
 footer, #MainMenu, header { visibility: hidden; }
+.stApp, section[data-testid="stMain"] {
+  background: linear-gradient(135deg, #f0f4ff 0%, #faf5ff 50%, #f0fdf4 100%) !important;
+  min-height: 100vh;
+}
 
-/* ── STREAMLIT OVERRIDES ── */
-.stApp { background-color: #f8fafc !important; }
-section[data-testid="stMain"] { background-color: #f8fafc !important; }
-
-/* ── BUTTONS ── */
+/* ━━━━ BUTTONS ━━━━ */
 .stButton > button {
-  background: #059669 !important;
-  color: #ffffff !important;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6) !important;
+  color: #fff !important;
   border: none !important;
-  border-radius: 10px !important;
-  padding: 14px 20px !important;
-  font-size: 16px !important;
-  font-weight: 700 !important;
-  font-family: 'Sarabun', sans-serif !important;
+  border-radius: 12px !important;
+  padding: 13px 20px !important;
+  font-size: 15px !important;
+  font-weight: 600 !important;
+  font-family: 'Prompt', sans-serif !important;
   width: 100% !important;
+  letter-spacing: .3px !important;
+  box-shadow: 0 4px 12px rgba(99,102,241,.25) !important;
+  transition: all .2s !important;
 }
-.stButton > button:hover { background: #047857 !important; }
-.stButton > button:disabled { opacity: .4 !important; }
+.stButton > button:hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 6px 16px rgba(99,102,241,.35) !important;
+}
+.stButton > button:disabled { opacity: .4 !important; box-shadow: none !important; }
 
-/* ── INPUTS ── */
-input, textarea, select,
+/* ━━━━ INPUTS ━━━━ */
 .stTextInput input,
-.stSelectbox select,
 .stNumberInput input,
-div[data-baseweb="input"] input,
-div[data-baseweb="select"] input {
-  background: #ffffff !important;
-  color: #111827 !important;
-  border: 1.5px solid #d1d5db !important;
-  border-radius: 8px !important;
-  font-size: 16px !important;
-  font-family: 'Sarabun', sans-serif !important;
+div[data-baseweb="input"] input {
+  background: #fff !important;
+  color: #0f172a !important;
+  border: 1.5px solid #c7d2fe !important;
+  border-radius: 10px !important;
+  font-size: 15px !important;
+  font-family: 'Prompt', sans-serif !important;
   padding: 10px 14px !important;
+  box-shadow: 0 1px 3px rgba(99,102,241,.08) !important;
+  transition: border-color .2s !important;
 }
+.stTextInput input:focus, .stNumberInput input:focus {
+  border-color: #6366f1 !important;
+  box-shadow: 0 0 0 3px rgba(99,102,241,.12) !important;
+}
+.stTextInput input::placeholder { color: #a5b4fc !important; }
+
 div[data-baseweb="select"] > div {
-  background: #ffffff !important;
-  border: 1.5px solid #d1d5db !important;
-  color: #111827 !important;
+  background: #fff !important;
+  border: 1.5px solid #c7d2fe !important;
+  border-radius: 10px !important;
+  color: #0f172a !important;
+  box-shadow: 0 1px 3px rgba(99,102,241,.08) !important;
 }
 div[data-baseweb="select"] span,
-div[data-baseweb="select"] div {
-  color: #111827 !important;
+div[data-baseweb="select"] div { color: #0f172a !important; }
+
+/* ━━━━ LABELS ━━━━ */
+label, p, span, div { color: #0f172a !important; }
+.stTextInput label, .stSelectbox label, .stNumberInput label {
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  color: #4f46e5 !important;
+  text-transform: uppercase !important;
+  letter-spacing: .6px !important;
 }
 
-/* ── LABELS ── */
-label, .stTextInput label, .stSelectbox label,
-p, span, div {
-  color: #111827 !important;
-}
-
-/* ── TABS ── */
+/* ━━━━ TABS ━━━━ */
 .stTabs [data-baseweb="tab-list"] {
-  background: #e5e7eb !important;
-  border-radius: 10px !important;
-  padding: 4px !important;
-  gap: 2px !important;
+  background: #e0e7ff !important;
+  border-radius: 14px !important;
+  padding: 5px !important;
+  gap: 3px !important;
+  border: 1px solid #c7d2fe !important;
 }
 .stTabs [data-baseweb="tab"] {
-  font-size: 15px !important;
+  font-size: 14px !important;
   font-weight: 600 !important;
   padding: 10px 16px !important;
-  color: #6b7280 !important;
-  font-family: 'Sarabun', sans-serif !important;
-  border-radius: 8px !important;
+  color: #6366f1 !important;
+  font-family: 'Prompt', sans-serif !important;
+  border-radius: 10px !important;
+  transition: all .2s !important;
 }
 .stTabs [aria-selected="true"] {
-  background: #059669 !important;
-  color: #ffffff !important;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6) !important;
+  color: #fff !important;
+  box-shadow: 0 4px 10px rgba(99,102,241,.3) !important;
 }
 
-/* ── EXPANDER ── */
+/* ━━━━ EXPANDER ━━━━ */
 div[data-testid="stExpander"] {
-  background: #ffffff !important;
-  border: 1.5px solid #d1d5db !important;
-  border-radius: 12px !important;
+  background: rgba(255,255,255,.8) !important;
+  border: 1.5px solid #c7d2fe !important;
+  border-radius: 14px !important;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 2px 12px rgba(99,102,241,.08) !important;
 }
 div[data-testid="stExpander"] summary {
-  color: #111827 !important;
+  color: #4f46e5 !important;
   font-size: 15px !important;
   font-weight: 600 !important;
 }
 
-/* ── METRIC ── */
+/* ━━━━ METRICS ━━━━ */
 div[data-testid="stMetric"] {
-  background: #ffffff !important;
-  border: 1.5px solid #d1d5db !important;
-  border-radius: 10px !important;
+  background: rgba(255,255,255,.9) !important;
+  border: 1.5px solid #c7d2fe !important;
+  border-radius: 12px !important;
   padding: 14px !important;
+  box-shadow: 0 2px 8px rgba(99,102,241,.08) !important;
 }
-div[data-testid="stMetric"] label { color: #6b7280 !important; font-size:13px !important; }
-div[data-testid="stMetric"] div[data-testid="stMetricValue"] { color: #111827 !important; font-size:22px !important; font-weight:700 !important; }
+div[data-testid="stMetric"] label {
+  color: #6366f1 !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  letter-spacing: .5px !important;
+}
+div[data-testid="stMetricValue"] {
+  color: #0f172a !important;
+  font-size: 22px !important;
+  font-weight: 700 !important;
+  font-family: 'JetBrains Mono', monospace !important;
+}
 
-/* ── SLIDER ── */
-div[data-testid="stSlider"] label { color: #111827 !important; font-size: 15px !important; }
-div[data-testid="stSlider"] div[data-testid="stTickBarMax"],
-div[data-testid="stSlider"] div[data-testid="stTickBarMin"] { color: #6b7280 !important; }
+/* ━━━━ SLIDER ━━━━ */
+div[data-testid="stSlider"] label {
+  color: #4f46e5 !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+}
 
-/* ── RADIO ── */
-div[data-testid="stRadio"] label { color: #111827 !important; font-size: 15px !important; }
-div[data-testid="stRadio"] p { color: #111827 !important; }
+/* ━━━━ RADIO ━━━━ */
+div[data-testid="stRadio"] label,
+div[data-testid="stRadio"] p { color: #0f172a !important; font-size: 15px !important; }
 
-/* ── DATAFRAME ── */
-div[data-testid="stDataFrame"] { border: 1.5px solid #d1d5db !important; border-radius: 10px !important; }
-
-/* ── ALERTS ── */
+/* ━━━━ ALERTS ━━━━ */
+div[data-testid="stAlert"] { border-radius: 12px !important; }
 div[data-testid="stAlert"] p { color: inherit !important; }
 
-/* ── CUSTOM CARDS ── */
+/* ━━━━ CAPTION ━━━━ */
+.stCaption, small { color: #818cf8 !important; font-size: 12px !important; }
+
+/* ━━━━ DATAFRAME ━━━━ */
+div[data-testid="stDataFrame"] {
+  border: 1.5px solid #c7d2fe !important;
+  border-radius: 12px !important;
+  overflow: hidden !important;
+}
+
+/* ━━━━ CUSTOM CARDS ━━━━ */
 .sc {
-  background: #ffffff;
-  border: 1.5px solid #e5e7eb;
-  border-radius: 14px;
+  background: rgba(255,255,255,.85);
+  border: 1.5px solid #e0e7ff;
+  border-radius: 16px;
   padding: 16px;
   margin-bottom: 12px;
-  box-shadow: 0 1px 4px rgba(0,0,0,.06);
+  box-shadow: 0 2px 12px rgba(99,102,241,.08);
+  backdrop-filter: blur(8px);
+  transition: box-shadow .2s;
 }
-.sc.buy  { border-left: 4px solid #059669; }
-.sc.sell { border-left: 4px solid #dc2626; }
-.sc.watch{ border-left: 4px solid #d97706; }
+.sc:hover { box-shadow: 0 4px 20px rgba(99,102,241,.15); }
+.sc.buy   { border-left: 4px solid #10b981; background: rgba(240,253,250,.9); }
+.sc.sell  { border-left: 4px solid #ef4444; background: rgba(255,241,242,.9); }
+.sc.watch { border-left: 4px solid #f59e0b; background: rgba(255,251,235,.9); }
 
-.mono { font-family: 'IBM Plex Mono', monospace; }
-.bull { color: #059669 !important; }
-.bear { color: #dc2626 !important; }
-.neut { color: #d97706 !important; }
-.dim  { color: #6b7280 !important; }
+/* ━━━━ TYPOGRAPHY ━━━━ */
+.mono  { font-family: 'JetBrains Mono', monospace !important; }
+.bull  { color: #059669 !important; font-weight: 600 !important; }
+.bear  { color: #dc2626 !important; font-weight: 600 !important; }
+.neut  { color: #d97706 !important; font-weight: 600 !important; }
+.dim   { color: #818cf8 !important; }
 
-.px-xl { font-size: 30px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; }
-.px-lg { font-size: 22px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; }
-.sym-lg{ font-size: 20px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; }
+.px-xl { font-size: 32px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+.px-lg { font-size: 22px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+.sym-lg{ font-size: 20px; font-weight: 700; font-family: 'JetBrains Mono', monospace; color: #0f172a; }
 
+/* ━━━━ INDICATOR BOX ━━━━ */
 .ib {
-  background: #f1f5f9;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  padding: 10px;
+  background: rgba(255,255,255,.9);
+  border: 1.5px solid #e0e7ff;
+  border-radius: 10px;
+  padding: 10px 8px;
   text-align: center;
   margin-bottom: 7px;
+  box-shadow: 0 1px 4px rgba(99,102,241,.06);
 }
-.ib .lbl { font-size: 11px; color: #6b7280; text-transform: uppercase; letter-spacing: .5px; }
-.ib .val { font-size: 18px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; margin-top: 3px; color: #111827; }
+.ib .lbl {
+  font-size: 10px; color: #818cf8 !important;
+  text-transform: uppercase; letter-spacing: .8px; font-weight: 600;
+}
+.ib .val {
+  font-size: 18px; font-weight: 700;
+  font-family: 'JetBrains Mono', monospace; margin-top: 3px; color: #0f172a;
+}
 .ib .sig { font-size: 11px; margin-top: 2px; }
 
+/* ━━━━ TARGET BOX ━━━━ */
 .tb {
-  background: #f1f5f9;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  padding: 8px;
+  background: rgba(255,255,255,.9);
+  border: 1.5px solid #e0e7ff;
+  border-radius: 10px;
+  padding: 10px 6px;
   text-align: center;
 }
-.tb .lbl { font-size: 10px; color: #6b7280; text-transform: uppercase; }
-.tb .val { font-size: 14px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; margin-top: 3px; }
+.tb .lbl { font-size: 10px; color: #818cf8 !important; text-transform: uppercase; font-weight: 600; }
+.tb .val { font-size: 14px; font-weight: 700; font-family: 'JetBrains Mono', monospace; margin-top: 3px; }
 
-.stag { display: inline-block; font-size: 13px; padding: 5px 11px; border-radius: 20px; font-weight: 600; margin: 3px; }
-.stag.b { background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; }
+/* ━━━━ SIGNAL TAGS ━━━━ */
+.stag {
+  display: inline-block; font-size: 12px; padding: 5px 12px;
+  border-radius: 20px; font-weight: 600; margin: 3px;
+}
+.stag.b { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
 .stag.s { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
 
+/* ━━━━ SCORE RING ━━━━ */
 .ring {
   width: 68px; height: 68px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   border: 3px solid; font-size: 22px; font-weight: 700;
-  font-family: 'IBM Plex Mono', monospace; flex-shrink: 0;
+  font-family: 'JetBrains Mono', monospace; flex-shrink: 0;
 }
-.ring.h { color: #059669; border-color: #059669; background: #d1fae5; }
-.ring.m { color: #b45309; border-color: #d97706; background: #fef3c7; }
-.ring.l { color: #dc2626; border-color: #dc2626; background: #fee2e2; }
+.ring.h { color: #059669; border-color: #34d399; background: #d1fae5; }
+.ring.m { color: #b45309; border-color: #fbbf24; background: #fef3c7; }
+.ring.l { color: #dc2626; border-color: #f87171; background: #fee2e2; }
+
+/* ━━━━ CHIP SIGNALS ━━━━ */
+.chip-buy   { display:inline-block;background:#d1fae5;color:#065f46;border:1.5px solid #6ee7b7;border-radius:20px;padding:4px 14px;font-weight:700;font-size:13px; }
+.chip-sell  { display:inline-block;background:#fee2e2;color:#991b1b;border:1.5px solid #fca5a5;border-radius:20px;padding:4px 14px;font-weight:700;font-size:13px; }
+.chip-watch { display:inline-block;background:#fef3c7;color:#92400e;border:1.5px solid #fde68a;border-radius:20px;padding:4px 14px;font-weight:700;font-size:13px; }
+.chip-hold  { display:inline-block;background:#e0e7ff;color:#4338ca;border:1.5px solid #c7d2fe;border-radius:20px;padding:4px 14px;font-weight:700;font-size:13px; }
+
+/* ━━━━ PROGRESS BAR ━━━━ */
+div[data-testid="stProgressBar"] > div {
+  background: #e0e7ff !important;
+  border-radius: 99px !important;
+}
+div[data-testid="stProgressBar"] > div > div {
+  background: linear-gradient(90deg, #6366f1, #8b5cf6) !important;
+  border-radius: 99px !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -572,10 +648,12 @@ for k,v in [("st_ok",False),("st_mkt",None),("st_rt",None),("st_inv",None),
 
 # ── Main header ───────────────────────────────────────────────
 st.markdown("""
-<div style="padding:18px 0 10px;text-align:center">
-  <div style="font-size:28px;font-weight:700;color:#111827">📈 Stock Pro</div>
-  <div style="font-size:14px;color:#6b7280;margin-top:5px">
-    Settrade Real-time · SET50 · US Tech · CN Tech · AI วิเคราะห์
+<div style="padding:20px 0 12px;text-align:center">
+  <div style="font-size:30px;font-weight:700;background:linear-gradient(135deg,#6366f1,#8b5cf6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">
+    📈 Stock Pro
+  </div>
+  <div style="font-size:13px;color:#818cf8;margin-top:6px;font-weight:500;letter-spacing:.5px">
+    SETTRADE REAL-TIME · SET50 · US TECH · CN TECH · AI POWERED
   </div>
 </div>
 """, unsafe_allow_html=True)
@@ -612,24 +690,27 @@ with st.expander("⚙️ ตั้งค่า API Keys & Settrade", expanded=no
     st.markdown("##### 🏦 Settrade API (สำหรับหุ้น SET)")
 
     if st.session_state.get("st_ok"):
-        st.success("✅ เชื่อมต่อ Settrade แล้ว")
+        acc = st.session_state.get("account_no","")
+        st.success("✅ เชื่อมต่อ Settrade แล้ว" + (f"  ·  บัญชี: {acc}" if acc else ""))
         if st.button("ออกจากระบบ Settrade", key="logout_main"):
             st.session_state.update(st_ok=False,st_mkt=None,st_rt=None,st_inv=None)
             st.rerun()
     else:
-        s1, s2 = st.columns(2)
-        with s1:
-            _app_id     = st.text_input("APP_ID",     key="main_app_id")
+        fa, fb = st.columns(2)
+        with fa:
+            _app_id     = st.text_input("APP_ID",     key="main_app_id",     placeholder="xxxxxxxxxxxxxxxx")
+            _app_secret = st.text_input("APP_SECRET", key="main_app_secret", placeholder="••••••••", type="password")
+            _account_no = st.text_input("ACCOUNT_NO", key="main_account_no", placeholder="เช่น Narats-E")
+        with fb:
             _app_code   = st.text_input("APP_CODE",   key="main_app_code",   value="SANDBOX")
-        with s2:
-            _app_secret = st.text_input("APP_SECRET", key="main_app_secret", type="password")
             _broker_id  = st.text_input("BROKER_ID",  key="main_broker_id",  value="SANDBOX")
+            st.caption("SANDBOX = ทดสอบ\nใส่รหัสโบรกเกอร์จริงเพื่อดู portfolio จริง")
 
-        if st.button("🔗 เชื่อมต่อ Settrade", key="connect_main"):
+        if st.button("🔗 เชื่อมต่อ Settrade", key="connect_main", use_container_width=True):
             if not SETTRADE_OK:
                 st.error("settrade_v2 ไม่ได้ติดตั้ง — ตรวจ requirements.txt")
             elif not _app_id or not _app_secret:
-                st.error("กรุณาใส่ APP_ID และ APP_SECRET")
+                st.warning("กรุณาใส่ APP_ID และ APP_SECRET")
             else:
                 try:
                     with st.spinner("กำลังเชื่อมต่อ..."):
@@ -642,16 +723,17 @@ with st.expander("⚙️ ตั้งค่า API Keys & Settrade", expanded=no
                         mkt_api = inv.Market()
                         rt_api  = inv.Realtime()
                         test = mkt_api.get_candlestick("PTT", interval="1d", limit=3)
-                        if test:
-                            st.session_state.update(
-                                st_ok=True, st_mkt=mkt_api,
-                                st_rt=rt_api, st_inv=inv,
-                                setup_done=True,
-                            )
-                            st.success("✅ เชื่อมต่อสำเร็จ!")
-                            st.rerun()
-                        else:
-                            st.error("เชื่อมต่อได้แต่ดึงข้อมูลไม่ได้")
+                    if test:
+                        st.session_state.update(
+                            st_ok=True, st_mkt=mkt_api,
+                            st_rt=rt_api, st_inv=inv,
+                            setup_done=True,
+                            account_no=_account_no.strip(),
+                        )
+                        st.success("✅ เชื่อมต่อสำเร็จ!")
+                        st.rerun()
+                    else:
+                        st.error("เชื่อมต่อได้แต่ดึงข้อมูลไม่ได้ — ตรวจ credential")
                 except Exception as e:
                     st.error("เชื่อมต่อไม่สำเร็จ: " + str(e))
 
@@ -723,9 +805,9 @@ with t1:
                 <div class="sc {lc}">
                   <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
                     <div>
-                      <div class="sym-lg">{sym} <span style="font-size:13px;color:#6b7280;font-family:'Sarabun',sans-serif">{name}</span></div>
-                      <div style="margin-top:8px">{sig_ic(S['sig'])} <b style="color:#111827">{sig_th(S['sig'])}</b>
-                        <span style="font-size:12px;color:#6b7280;margin-left:8px">R/R 1:{S['rr']}</span></div>
+                      <div class="sym-lg">{sym} <span style="font-size:13px;color:#818cf8;font-family:'Sarabun',sans-serif">{name}</span></div>
+                      <div style="margin-top:8px">{sig_ic(S['sig'])} <b style="color:#0f172a">{sig_th(S['sig'])}</b>
+                        <span style="font-size:12px;color:#818cf8;margin-left:8px">R/R 1:{S['rr']}</span></div>
                     </div>
                     <div style="text-align:right">
                       <div class="px-lg" style="color:{up_c}">{cur2}{fmt(I['price'])}</div>
@@ -806,16 +888,16 @@ with t2:
               <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
                 <div>
                   <div style="font-size:26px;font-weight:700;font-family:'IBM Plex Mono',monospace">{sym2}</div>
-                  <div style="font-size:13px;color:#6b7280;margin-top:3px">{name2} &middot; {mkt_in}</div>
-                  <div style="margin-top:10px">{sig_ic(S2['sig'])} <b style="font-size:16px;color:#111827">{sig_th(S2['sig'])}</b></div>
-                  {('<div style="font-size:13px;color:#6b7280;margin-top:4px">Real-time: ฿'+fmt(float(q2.get("last",0)))+'</div>') if q2 else ""}
+                  <div style="font-size:13px;color:#818cf8;margin-top:3px">{name2} &middot; {mkt_in}</div>
+                  <div style="margin-top:10px">{sig_ic(S2['sig'])} <b style="font-size:16px;color:#0f172a">{sig_th(S2['sig'])}</b></div>
+                  {('<div style="font-size:13px;color:#818cf8;margin-top:4px">Real-time: ฿'+fmt(float(q2.get("last",0)))+'</div>') if q2 else ""}
                 </div>
                 <div class="ring {sc_cl(S2['sc'])}">{S2['sc']}</div>
               </div>
               <div class="px-xl" style="color:{up_c}">{cur2}{fmt(p2)}</div>
               <div style="font-size:15px;color:{up_c};font-weight:700;margin-top:5px">
                 {pstr(I2['chg'])} วันนี้
-                <span style="color:#6b7280;font-weight:400"> &nbsp; {pstr(I2['chg5'],1)} 5 วัน</span>
+                <span style="color:#818cf8;font-weight:400"> &nbsp; {pstr(I2['chg5'],1)} 5 วัน</span>
               </div>
             </div>
             """, unsafe_allow_html=True)
@@ -872,10 +954,10 @@ with t2:
 
             rr_c = "#059669" if S2["rr"]>=2 else "#d97706" if S2["rr"]>=1.5 else "#dc2626"
             st.markdown(f"""
-            <div style="background:#eff6ff;border:1px solid #bfdbfe;
+            <div style="background:#ede9fe;border:1.5px solid #c4b5fd;
               border-radius:10px;padding:12px 16px;margin-top:10px;
               display:flex;justify-content:space-between;align-items:center">
-              <span style="font-size:14px;color:#6b7280">Risk / Reward</span>
+              <span style="font-size:14px;color:#818cf8">Risk / Reward</span>
               <span style="font-size:22px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:{rr_c}">
                 1 : {S2['rr']}</span>
             </div>
@@ -899,9 +981,9 @@ with t2:
             # 52W
             st.markdown("#### 52-Week Range")
             st.markdown(f"""
-            <div style="display:flex;justify-content:space-between;font-size:12px;color:#6b7280;margin-bottom:5px">
+            <div style="display:flex;justify-content:space-between;font-size:12px;color:#818cf8;margin-bottom:5px">
               <span>Low {cur2}{fmt(I2['l52'])}</span>
-              <span style="color:#111827;font-weight:700">{p52p:.0f}% จากต่ำสุด</span>
+              <span style="color:#0f172a;font-weight:700">{p52p:.0f}% จากต่ำสุด</span>
               <span>High {cur2}{fmt(I2['h52'])}</span>
             </div>
             """, unsafe_allow_html=True)
@@ -987,9 +1069,9 @@ with t3:
               <div style="display:flex;justify-content:space-between;align-items:center">
                 <div>
                   <span style="font-size:18px;font-weight:700;font-family:'IBM Plex Mono',monospace">{sym3}</span>
-                  <span style="font-size:13px;color:#6b7280;margin-left:8px">{mkt3}</span>
-                  <div style="margin-top:6px">{sig_ic(sig3)} <b style="color:#111827">{sig_th(sig3)}</b>
-                    <span style="font-size:12px;color:#6b7280;margin-left:8px">Score {sc3}</span></div>
+                  <span style="font-size:13px;color:#818cf8;margin-left:8px">{mkt3}</span>
+                  <div style="margin-top:6px">{sig_ic(sig3)} <b style="color:#0f172a">{sig_th(sig3)}</b>
+                    <span style="font-size:12px;color:#818cf8;margin-left:8px">Score {sc3}</span></div>
                 </div>
                 <div style="text-align:right">
                   <div style="font-size:22px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:{up_c3}">
@@ -1000,7 +1082,7 @@ with t3:
               <div style="background:#d1d5db;border-radius:3px;height:4px;margin-top:10px">
                 <div style="width:{sc3}%;height:4px;border-radius:3px;background:{sc_co(sc3)}"></div>
               </div>
-              <div style="font-size:12px;color:#6b7280;margin-top:5px">
+              <div style="font-size:12px;color:#818cf8;margin-top:5px">
                 RSI {rsi3:.0f} · {'EMA bullish' if e12_3>e26_3 else 'EMA bearish'} · {'เหนือ SMA20' if price3>s20_3 else 'ต่ำกว่า SMA20'}
               </div>
             </div>

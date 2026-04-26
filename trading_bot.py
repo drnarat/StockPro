@@ -449,7 +449,12 @@ def score(I, os=35, ob=65):
 # ── Settrade helpers ──────────────────────────────────────────
 def st_candles(sym, mkt_api, limit=365):
     try:
-        data = mkt_api.get_candlestick(sym, interval="1d", limit=limit)
+        # Try different method names across settrade-v2 versions
+        data = None
+        if hasattr(mkt_api, 'get_candlestick'):
+            data = mkt_api.get_candlestick(sym, interval="1d", limit=limit)
+        elif hasattr(mkt_api, 'get_price_chart_by_period'):
+            data = mkt_api.get_price_chart_by_period(sym, "1D")
         if not data: return None
         df = pd.DataFrame(data)
         rename = {}
@@ -467,10 +472,17 @@ def st_candles(sym, mkt_api, limit=365):
     except: return None
 
 def st_quote(sym, rt_api):
+    if rt_api is None:
+        return {}
     try:
-        q = rt_api.get_quote_symbol(sym)
-        return q or {}
-    except: return {}
+        # Try different method names
+        if hasattr(rt_api, 'get_quote_symbol'):
+            return rt_api.get_quote_symbol(sym) or {}
+        elif hasattr(rt_api, 'get_quote'):
+            return rt_api.get_quote(sym) or {}
+        return {}
+    except:
+        return {}
 
 def st_portfolio(inv):
     try:
@@ -698,8 +710,8 @@ with st.expander("⚙️ ตั้งค่า API Keys & Settrade", expanded=no
     else:
         fa, fb = st.columns(2)
         with fa:
-            _app_id     = st.text_input("APP_ID",     key="main_app_id",     placeholder="xxxxxxxxxxxxxxxx")
-            _app_secret = st.text_input("APP_SECRET", key="main_app_secret", placeholder="••••••••", type="password")
+            _app_id     = st.text_input("APP_ID",     key="main_app_id",     placeholder="กรอก APP_ID จาก developer.settrade.com")
+            _app_secret = st.text_input("APP_SECRET", key="main_app_secret", placeholder="กรอก APP_SECRET", type="password")
             _account_no = st.text_input("ACCOUNT_NO", key="main_account_no", placeholder="เช่น Narats-E")
         with fb:
             _app_code   = st.text_input("APP_CODE",   key="main_app_code",   value="SANDBOX")
@@ -709,7 +721,7 @@ with st.expander("⚙️ ตั้งค่า API Keys & Settrade", expanded=no
         if st.button("🔗 เชื่อมต่อ Settrade", key="connect_main", use_container_width=True):
             if not SETTRADE_OK:
                 st.error("settrade_v2 ไม่ได้ติดตั้ง — ตรวจ requirements.txt")
-            elif not _app_id or not _app_secret:
+            elif not _app_id.strip() or not _app_secret.strip():
                 st.warning("กรุณาใส่ APP_ID และ APP_SECRET")
             else:
                 try:
@@ -720,22 +732,76 @@ with st.expander("⚙️ ตั้งค่า API Keys & Settrade", expanded=no
                             app_code=_app_code.strip(),
                             broker_id=_broker_id.strip(),
                         )
-                        mkt_api = inv.Market()
-                        rt_api  = inv.Realtime()
-                        test = mkt_api.get_candlestick("PTT", interval="1d", limit=3)
-                    if test:
+                        # settrade-v2 API — try multiple method styles
+                        mkt_api = None
+                        rt_api  = None
+                        # Style 1: new API (most common in recent versions)
+                        if hasattr(inv, 'market'):
+                            mkt_api = inv.market
+                            rt_api  = inv.realtime if hasattr(inv, 'realtime') else None
+                        # Style 2: callable Market() / Realtime()
+                        elif hasattr(inv, 'Market') and callable(inv.Market):
+                            try:
+                                mkt_api = inv.Market()
+                                rt_api  = inv.Realtime() if hasattr(inv, 'Realtime') else None
+                            except TypeError:
+                                mkt_api = inv.Market
+                                rt_api  = inv.Realtime if hasattr(inv, 'Realtime') else None
+                        # Style 3: direct attribute
+                        elif hasattr(inv, 'Market'):
+                            mkt_api = inv.Market
+                            rt_api  = inv.Realtime if hasattr(inv, 'Realtime') else None
+                        # Style 4: EquityMarket (some versions)
+                        elif hasattr(inv, 'EquityMarket'):
+                            mkt_api = inv.EquityMarket()
+                            rt_api  = None
+
+                        if mkt_api is None:
+                            avail = [a for a in dir(inv) if not a.startswith('_')]
+                            raise AttributeError(
+                                f"ไม่พบ Market API\n"
+                                f"settrade-v2 version นี้มี attributes: {avail}"
+                            )
+
+                        # Test connection
+                        test = None
+                        for method in ['get_candlestick', 'get_price_chart_by_period']:
+                            if hasattr(mkt_api, method):
+                                try:
+                                    if method == 'get_candlestick':
+                                        test = mkt_api.get_candlestick("PTT", interval="1d", limit=3)
+                                    else:
+                                        test = mkt_api.get_price_chart_by_period("PTT", "1D")
+                                    if test:
+                                        break
+                                except Exception:
+                                    pass
+
+                    if mkt_api:
                         st.session_state.update(
-                            st_ok=True, st_mkt=mkt_api,
-                            st_rt=rt_api, st_inv=inv,
+                            st_ok=True,
+                            st_mkt=mkt_api,
+                            st_rt=rt_api,
+                            st_inv=inv,
                             setup_done=True,
                             account_no=_account_no.strip(),
+                            app_id_saved="",      # ไม่บันทึก credential
+                            app_secret_saved="",  # ไม่บันทึก credential
                         )
                         st.success("✅ เชื่อมต่อสำเร็จ!")
                         st.rerun()
                     else:
                         st.error("เชื่อมต่อได้แต่ดึงข้อมูลไม่ได้ — ตรวจ credential")
+                except AttributeError as e:
+                    st.error(str(e))
+                    st.code("pip install settrade-v2 --upgrade", language="bash")
                 except Exception as e:
-                    st.error("เชื่อมต่อไม่สำเร็จ: " + str(e))
+                    err = str(e)
+                    st.error("เชื่อมต่อไม่สำเร็จ: " + err)
+                    if "401" in err or "unauthorized" in err.lower():
+                        st.warning("APP_ID หรือ APP_SECRET ไม่ถูกต้อง")
+                    elif "403" in err or "forbidden" in err.lower():
+                        st.warning("APP_CODE หรือ BROKER_ID ไม่ถูกต้อง")
 
     st.markdown("---")
     st.markdown("##### Parameters")
@@ -1102,7 +1168,20 @@ with t4:
     else:
         if st.button("🔄 โหลด Portfolio"):
             inv = st.session_state.st_inv
-            port = inv.Portfolio()
+            # Portfolio API — try multiple styles
+            port = None
+            if hasattr(inv, 'portfolio'):
+                port = inv.portfolio
+            elif hasattr(inv, 'Portfolio') and callable(inv.Portfolio):
+                try:
+                    port = inv.Portfolio()
+                except TypeError:
+                    port = inv.Portfolio
+            elif hasattr(inv, 'Portfolio'):
+                port = inv.Portfolio
+            if port is None:
+                st.error("ไม่พบ Portfolio API ใน settrade-v2 version นี้")
+                st.stop()
 
             # Balance
             st.markdown("#### 💰 สรุปบัญชี")

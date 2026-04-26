@@ -9,7 +9,7 @@ import warnings
 warnings.filterwarnings('ignore')
 
 # --- 1. UI SETUP ---
-st.set_page_config(layout="wide", page_title="SRAN AI Stock Intelligence", page_icon="📈")
+st.set_page_config(layout="wide", page_title="SRAN AI Stock Platform v10", page_icon="📈")
 
 # --- 2. SIDEBAR ---
 with st.sidebar:
@@ -28,105 +28,103 @@ with st.sidebar:
     st.divider()
     gemini_key = st.text_input("Gemini API Key", type="password")
 
-# --- 3. THE ANALYTICS ENGINE ---
-class StockAnalyst:
+# --- 3. ANALYTICS ENGINE ---
+class FinalEngine:
     def __init__(self, config):
         try:
-            self.investor = Investor(
-                app_id=config['id'], app_secret=config['secret'],
-                app_code=config['code'], broker_id=config['broker']
-            )
+            self.investor = Investor(app_id=config['id'], app_secret=config['secret'],
+                                     app_code=config['code'], broker_id=config['broker'])
             self.market = self.investor.MarketData()
         except: self.market = None
 
-    def get_full_metrics(self, symbol):
+    def get_data(self, symbol):
         try:
             res = self.market.get_candlestick(symbol, "1D", 350)
             df = pd.DataFrame(res)
             if df.empty: return None
 
-            # คำนวณชุดใหญ่
+            # คำนวณแบบจัดเต็ม
             df['SMA_F'] = ta.sma(df['last'], length=sma_f_len)
             df['SMA_S'] = ta.sma(df['last'], length=sma_s_len)
             df['EMA_20'] = ta.ema(df['last'], length=20)
-            df['RSI'] = ta.rsi(df['last'], length=14)
+            df['RSI_VAL'] = ta.rsi(df['last'], length=14)
+            df['ATR_VAL'] = ta.atr(df['high'], df['low'], df['last'], length=14)
+            df['OBV_VAL'] = ta.obv(df['last'], df['volume'])
             
-            # MACD
+            # Indicators ที่ได้เป็น DataFrame (MACD, Stoch, BB)
             macd = ta.macd(df['last'])
-            # Stochastic
             stoch = ta.stoch(df['high'], df['low'], df['last'])
-            # Bollinger Bands
             bb = ta.bbands(df['last'])
-            # Volatility & Volume
-            df['ATR'] = ta.atr(df['high'], df['low'], df['last'], length=14)
-            df['OBV'] = ta.obv(df['last'], df['volume'])
 
             return pd.concat([df, macd, stoch, bb], axis=1)
         except: return None
 
 # --- 4. MAIN INTERFACE ---
-tab1, tab2, tab3 = st.tabs(["🔍 Global Scanner", "🧠 AI Deep Insight", "📊 Sentiment Gauge"])
+tab1, tab2, tab3 = st.tabs(["🔍 Market Scanner", "🧠 AI Analysis", "📊 Sentiment Gauge"])
 
 with tab1:
-    st.header(f"Multi-Indicator Scanner (Account: {c_account_no})")
-    if st.button("🚀 Run Comprehensive Scan"):
+    st.header(f"Full Strategy Scanner (Account: {c_account_no})")
+    if st.button("🚀 Start Deep Scan"):
         if not (c_app_id and c_app_secret):
-            st.warning("⚠️ กรุณากรอก API Credentials")
+            st.warning("⚠️ โปรดกรอก API Credentials")
         else:
             config = {'id': c_app_id, 'secret': c_app_secret, 'code': c_app_code, 'broker': c_broker_id}
-            engine = StockAnalyst(config)
+            engine = FinalEngine(config)
             
             if engine.market:
-                with st.spinner("กำลังเจาะข้อมูลและคำนวณอินดิเคเตอร์..."):
+                with st.spinner("กำลังดึงอินดิเคเตอร์ทุกแกน..."):
                     stocks = ["PTT", "CPALL", "AOT", "ADVANC", "KBANK", "SCB", "OR", "GULF", "DELTA", "BANPU"]
                     results = []
                     
                     for s in stocks:
-                        df = engine.get_full_metrics(s)
+                        df = engine.get_data(s)
                         if df is not None:
                             last = df.iloc[-1]
                             
-                            # มั่นใจว่าดึงค่ามาครบทุกตัว
+                            # --- [ WILDCARD MAPPING ] ---
+                            # ค้นหาคอลัมน์โดยใช้ Keywords แทนชื่อเต็ม (แก้ปัญหาเรื่องตัวเลข Slider)
+                            def find_val(keyword):
+                                cols = [c for c in df.columns if keyword in str(c)]
+                                return last[cols[0]] if cols else 0
+
                             results.append({
                                 "Stock": s,
-                                "Price": last.get('last', 0),
-                                "SMA_Fast": round(last.get('SMA_F', 0), 2),
-                                "SMA_Slow": round(last.get('SMA_S', 0), 2),
-                                "EMA_20": round(last.get('EMA_20', 0), 2),
-                                "RSI": round(last.get('RSI', 0), 2),
-                                "MACD": round(last.get('MACD_12_26_9', 0), 3),
-                                "MACD_Sig": round(last.get('MACDs_12_26_9', 0), 3),
-                                "Stoch_%K": round(last.get('STOCHk_14_3_3', 0), 2),
-                                "Stoch_%D": round(last.get('STOCHd_14_3_3', 0), 2),
-                                "BB_Upper": round(last.get('BBU_20_2.0', 0), 2),
-                                "BB_Lower": round(last.get('BBL_20_2.0', 0), 2),
-                                "ATR": round(last.get('ATR', 0), 3),
-                                "OBV": f"{last.get('OBV', 0):,.0f}"
+                                "Price": last['last'],
+                                "SMA_F": round(last['SMA_F'], 2) if not pd.isna(last['SMA_F']) else "N/A",
+                                "SMA_S": round(last['SMA_S'], 2) if not pd.isna(last['SMA_S']) else "N/A",
+                                "EMA_20": round(last['EMA_20'], 2),
+                                "RSI": round(last['RSI_VAL'], 2),
+                                "MACD": round(find_val('MACD_'), 3),
+                                "MACD_Sig": round(find_val('MACDs_'), 3),
+                                "Stoch_%K": round(find_val('STOCHk_'), 2),
+                                "Stoch_%D": round(find_val('STOCHd_'), 2),
+                                "BB_Upper": round(find_val('BBU_'), 2),
+                                "BB_Lower": round(find_val('BBL_'), 2),
+                                "ATR": round(last['ATR_VAL'], 3),
+                                "Volume (OBV)": f"{last['OBV_VAL']:,.0f}"
                             })
                     
                     if results:
-                        # แสดงผลเป็นตารางชุดใหญ่
-                        final_df = pd.DataFrame(results)
-                        st.dataframe(final_df, use_container_width=True)
-                        st.success(f"สแกนเสร็จสิ้น! แสดงผลทั้งหมด {len(final_df.columns)} อินดิเคเตอร์")
+                        st.dataframe(pd.DataFrame(results), use_container_width=True)
+                        st.success("✅ แสดงผลครบ 14 คอลัมน์อินดิเคเตอร์")
                     else: st.error("ไม่พบข้อมูลหลักทรัพย์")
 
-# [Tab 2 & 3: ปลอดภัยจาก NotFound และ Error]
+# [Tab 2 & 3: Stable Version]
 with tab2:
-    st.header("Gemini 30-Day Analysis")
-    target = st.text_input("ชื่อหุ้น", "PTT")
-    if st.button("🧠 Analyze Stock"):
+    st.header("Gemini 30-Day Insight")
+    target = st.text_input("หุ้น", "PTT")
+    if st.button("🧠 Analyze"):
         if gemini_key:
             try:
                 genai.configure(api_key=gemini_key)
                 models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
                 sel_model = "gemini-1.5-flash" if "models/gemini-1.5-flash" in models else "gemini-pro"
                 model = genai.GenerativeModel(sel_model)
-                resp = model.generate_content(f"วิเคราะห์หุ้น {target} ในตลาด SET: สรุปข่าว 30 วัน, Sentiment และความเสี่ยง (ภาษาไทย)")
+                resp = model.generate_content(f"สรุปหุ้น {target} ตลาด SET: ข่าว 30 วัน, Sentiment, ความเสี่ยง (ไทย)")
                 st.markdown(resp.text)
             except Exception as e: st.error(f"AI Error: {e}")
 
 with tab3:
     st.header("Fear & Greed Index")
-    fig = go.Figure(go.Indicator(mode="gauge+number", value=65, gauge={'axis': {'range': [0, 100]}, 'bar': {'color': "#1f77b4"}}))
+    fig = go.Figure(go.Indicator(mode="gauge+number", value=65))
     st.plotly_chart(fig, use_container_width=True)

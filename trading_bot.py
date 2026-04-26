@@ -29,7 +29,7 @@ with st.sidebar:
     st.divider()
     gemini_key = st.text_input("Gemini API Key", type="password")
 
-# --- 3. ANALYTICS ENGINE ---
+# --- 3. CORE ANALYTICS ENGINE ---
 class MasterEngine:
     def __init__(self, config):
         try:
@@ -40,12 +40,12 @@ class MasterEngine:
 
     def get_indicators(self, symbol):
         try:
-            # ดึงข้อมูลย้อนหลัง 350 วัน เพื่อรองรับ SMA ระยะยาว
+            # ดึงข้อมูลย้อนหลัง 350 วัน
             res = self.market.get_candlestick(symbol, "1D", 350)
             df = pd.DataFrame(res)
             if df.empty: return None
 
-            # [A] Trend Indicators
+            # [A] Trend
             df['SMA_F'] = ta.sma(df['last'], length=sma_f_len)
             df['SMA_S'] = ta.sma(df['last'], length=sma_s_len)
             df['EMA_20'] = ta.ema(df['last'], length=20)
@@ -60,45 +60,40 @@ class MasterEngine:
             df['ATR_V'] = ta.atr(df['high'], df['low'], df['last'], length=14)
             df['OBV_V'] = ta.obv(df['last'], df['volume'])
 
-            # รวมผลลัพธ์เข้าด้วยกัน
             return pd.concat([df, macd, stoch, bb], axis=1)
         except: return None
 
 # --- 4. MAIN INTERFACE ---
-tab1, tab2, tab3 = st.tabs(["🔍 Global Scanner", "🧠 AI Deep Analysis", "📊 Sentiment Gauge"])
+tab1, tab2, tab3 = st.tabs(["🔍 Global Scanner", "🧠 AI Deep Insight", "📊 Sentiment Gauge"])
 
 with tab1:
     st.header(f"Multi-Indicator Scanner (Account: {c_account_no})")
-    
-    # รายชื่อหุ้นเป้าหมาย
     stocks_to_scan = ["PTT", "CPALL", "AOT", "ADVANC", "KBANK", "SCB", "OR", "GULF", "DELTA", "BANPU"]
     
-    if st.button("🚀 Start Deep Scan"):
+    if st.button("🚀 Start Full Arsenal Scan"):
         if not (c_app_id and c_app_secret):
-            st.warning("⚠️ โปรดกรอก APP_ID และ APP_SECRET")
+            st.warning("⚠️ โปรดกรอก API Credentials")
         else:
             config = {'id': c_app_id, 'secret': c_app_secret, 'code': c_app_code, 'broker': c_broker_id}
             engine = MasterEngine(config)
             
             if engine.market:
-                with st.spinner("คำนวณอินดิเคเตอร์ 14 ตัว..."):
-                    scan_results = []
-                    
+                with st.spinner("ประมวลผล 14 อินดิเคเตอร์เชิงลึก..."):
+                    results = []
                     for s in stocks_to_scan:
                         df = engine.get_indicators(s)
                         if df is not None:
                             last = df.iloc[-1]
                             
-                            # 💡 หัวใจสำคัญ: ฟังก์ชันช่วยหาค่าจาก Column Name ที่ชื่อไม่คงที่
+                            # ฟังก์ชัน Wildcard ค้นหาคอลัมน์ที่ชื่อไม่คงที่
                             def get_v(keyword):
-                                cols = [c for c in df.columns if keyword in str(c)]
-                                if cols:
-                                    val = last[cols[0]]
+                                matched = [c for c in df.columns if keyword in str(c)]
+                                if matched:
+                                    val = last[matched[0]]
                                     return round(val, 3) if not pd.isna(val) else "N/A"
                                 return "N/A"
 
-                            # บังคับสร้าง Dictionary ที่มีครบทุกค่า (14 คอลัมน์)
-                            scan_results.append({
+                            results.append({
                                 "Symbol": s,
                                 "Price": last['last'],
                                 "SMA_Fast": get_v('SMA_F'),
@@ -115,18 +110,14 @@ with tab1:
                                 "Volume(OBV)": f"{last.get('OBV_V', 0):,.0f}"
                             })
                     
-                    if scan_results:
-                        st.dataframe(pd.DataFrame(scan_results), use_container_width=True)
-                        st.success(f"✅ ประมวลผลสำเร็จ: ตรวจพบ {len(pd.DataFrame(scan_results).columns)} คอลัมน์")
-                    else:
-                        st.error("ไม่พบข้อมูลหลักทรัพย์")
-            else:
-                st.error("เชื่อมต่อระบบ Settrade ล้มเหลว")
+                    if results:
+                        st.dataframe(pd.DataFrame(results), use_container_width=True)
+                        st.success(f"✅ สำเร็จ: แสดงผลครบทั้ง {len(pd.DataFrame(results).columns)} คอลัมน์")
+            else: st.error("เชื่อมต่อระบบ Settrade ล้มเหลว")
 
-# [Tab 2 & 3: ปลอดภัยจาก NotFound และ Error]
 with tab2:
     st.header("Gemini AI Strategy Advisor")
-    target_stock = st.text_input("ชื่อหุ้น", "PTT")
+    target = st.text_input("ชื่อหุ้น", "PTT")
     if st.button("🧠 Analyze Stock"):
         if gemini_key:
             try:
@@ -134,7 +125,7 @@ with tab2:
                 models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
                 sel_model = "gemini-1.5-flash" if "models/gemini-1.5-flash" in models else "gemini-pro"
                 model = genai.GenerativeModel(sel_model)
-                resp = model.generate_content(f"วิเคราะห์หุ้น {target_stock} ตลาด SET: ข่าวเด่น 30 วัน, Sentiment (ไทย)")
+                resp = model.generate_content(f"วิเคราะห์หุ้น {target} ตลาด SET: ข่าวเด่น 30 วัน, Sentiment (ไทย)")
                 st.markdown(resp.text)
             except Exception as e: st.error(f"AI Error: {e}")
 

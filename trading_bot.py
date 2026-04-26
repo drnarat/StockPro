@@ -790,19 +790,34 @@ with st.expander("⚙️ ตั้งค่า API Keys & Settrade", expanded=no
                         mkt_api = None
                         rt_api  = None
 
+                        acct_no = _account_no.strip()
+
                         if hasattr(inv, 'Equity'):
-                            mkt_api = inv.Equity()
+                            # version ใหม่ต้องส่ง account_no
+                            try:
+                                mkt_api = inv.Equity(acct_no) if acct_no else inv.Equity("")
+                            except TypeError:
+                                mkt_api = inv.Equity()
                         elif hasattr(inv, 'MarketData'):
-                            mkt_api = inv.MarketData()
+                            try:
+                                mkt_api = inv.MarketData(acct_no) if acct_no else inv.MarketData()
+                            except TypeError:
+                                mkt_api = inv.MarketData()
                         elif hasattr(inv, 'Market'):
                             mkt_api = inv.Market()
                         elif hasattr(inv, 'market'):
                             mkt_api = inv.market
 
                         if hasattr(inv, 'RealtimeDataConnection'):
-                            rt_api = inv.RealtimeDataConnection()
+                            try:
+                                rt_api = inv.RealtimeDataConnection()
+                            except Exception:
+                                rt_api = None
                         elif hasattr(inv, 'Realtime'):
-                            rt_api = inv.Realtime()
+                            try:
+                                rt_api = inv.Realtime()
+                            except Exception:
+                                rt_api = None
                         elif hasattr(inv, 'realtime'):
                             rt_api = inv.realtime
                         if mkt_api is None:
@@ -850,6 +865,24 @@ with st.expander("⚙️ ตั้งค่า API Keys & Settrade", expanded=no
                 except AttributeError as e:
                     st.error(str(e))
                     st.code("pip install settrade-v2 --upgrade", language="bash")
+                except TypeError as e:
+                    # แสดง signature จริงเพื่อ debug
+                    import inspect
+                    st.error("TypeError: " + str(e))
+                    try:
+                        inv2 = Investor(
+                            app_id=_app_id.strip(),
+                            app_secret=_app_secret.strip(),
+                            app_code=_app_code.strip(),
+                            broker_id=_broker_id.strip(),
+                        )
+                        if hasattr(inv2, 'Equity'):
+                            sig = str(inspect.signature(inv2.Equity))
+                            st.info(f"Equity() signature: {sig}")
+                        avail = [a for a in dir(inv2) if not a.startswith('_')]
+                        st.info(f"Available: {avail}")
+                    except Exception as e2:
+                        st.error("Debug error: " + str(e2))
                 except Exception as e:
                     err = str(e)
                     st.error("เชื่อมต่อไม่สำเร็จ: " + err)
@@ -1223,20 +1256,21 @@ with t4:
     else:
         if st.button("🔄 โหลด Portfolio"):
             inv = st.session_state.st_inv
-            # Portfolio API — settrade-v2 รองรับทุก version
-            port   = None
-            equity = None
-            # Version ใหม่: equity object จาก Equity()
+            # Portfolio API
+            port    = None
+            acct_no = st.session_state.get("account_no", "")
+
             if hasattr(inv, 'Equity'):
-                equity = inv.Equity()
-                port   = equity  # Equity มี get_portfolio, get_orders ฯลฯ
+                try:
+                    port = inv.Equity(acct_no) if acct_no else inv.Equity("")
+                except TypeError:
+                    port = inv.Equity()
             elif hasattr(inv, 'Portfolio') and callable(inv.Portfolio):
-                try:    port = inv.Portfolio()
-                except: port = inv.Portfolio
-            elif hasattr(inv, 'Portfolio'):
-                port = inv.Portfolio
+                try:    port = inv.Portfolio(acct_no) if acct_no else inv.Portfolio()
+                except: port = getattr(inv, 'Portfolio', None)
             elif hasattr(inv, 'portfolio'):
                 port = inv.portfolio
+
             if port is None:
                 st.error("ไม่พบ Portfolio API — ลอง pip install settrade-v2 --upgrade")
                 st.stop()

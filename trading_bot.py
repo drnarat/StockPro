@@ -516,30 +516,59 @@ def yf_info(ticker):
 
 # ── AI News Analysis — รองรับทั้ง Gemini และ Claude ──────────
 def build_analysis_prompt(sym, mkt, I, S, cur):
+    from datetime import datetime, timedelta
     mkt_th  = {"SET":"ตลาดหุ้นไทย SET","US":"ตลาด NASDAQ/NYSE","CN":"ตลาด NYSE CN ADR"}
     sig_map = {"buy":"ซื้อ","sell":"ขาย","watch":"เฝ้าระวัง","hold":"ถือ"}
+
+    today      = datetime.now().strftime("%d %B %Y")
+    month_ago  = (datetime.now() - timedelta(days=30)).strftime("%d %B %Y")
+    month_name = datetime.now().strftime("%B %Y")
+
     return (
-        f"วิเคราะห์หุ้น {sym} ({mkt_th.get(mkt,mkt)}) อย่างละเอียด:\n\n"
-        f"1. ค้นหาข่าวสำคัญในรอบ 1 ปีที่ผ่านมาที่กระทบราคาหุ้น "
-        f"แต่ละข่าวระบุว่า บวก/ลบ/กลาง และอธิบายผลกระทบ\n"
-        f"2. ปัจจัยพื้นฐาน แนวโน้มธุรกิจ คู่แข่ง ความเสี่ยงเชิงธุรกิจ\n"
-        f"3. สรุปสัญญาณเทคนิค:\n"
-        f"   - ราคา = {cur}{fmt(I.get('price',0))}\n"
-        f"   - RSI = {I.get('rsi',50):.1f}  |  MACD Hist = {I.get('macd',0):.4f}\n"
-        f"   - BB% = {I.get('bb_pct',0.5):.2f}  |  Stochastic = {I.get('stoch',50):.1f}\n"
-        f"   - ADX = {I.get('adx',0):.1f}  |  Vol Ratio = {I.get('vol_r',1):.2f}x\n"
-        f"   - คะแนนรวม = {S.get('sc',50)}/100  |  สัญญาณ = {sig_map.get(S.get('sig','hold'),'ถือ')}\n"
-        f"4. คำแนะนำ:\n"
-        f"   - จุดซื้อ = {cur}{S.get('entry',0)}\n"
-        f"   - เป้าหมาย 1 = {cur}{S.get('t1',0)}\n"
-        f"   - เป้าหมาย 2 = {cur}{S.get('t2',0)}\n"
-        f"   - Stop Loss = {cur}{S.get('sl',0)}\n"
-        f"   - Risk/Reward = 1:{S.get('rr',0)}\n"
-        f"5. ความเสี่ยงสำคัญที่นักลงทุนควรระวัง\n\n"
-        f"ตอบภาษาไทย กระชับ ได้ใจความ"
+        f"คุณคือนักวิเคราะห์หุ้นมืออาชีพ วันนี้คือ {today}\n\n"
+
+        f"## ขั้นตอนที่ 1 — ค้นข่าวล่าสุด (สำคัญมาก ทำก่อน)\n"
+        f"ค้นหาข่าวของ {sym} ({mkt_th.get(mkt,mkt)}) ที่เกิดขึ้นในช่วง {month_ago} ถึง {today} "
+        f"(30 วันล่าสุด) โดยค้นคำเหล่านี้:\n"
+        f'- "{sym} หุ้น ข่าว {month_name}"\n'
+        f'- "{sym} stock news {month_name}"\n'
+        f'- "{sym} ผลประกอบการ" หรือ "{sym} earnings"\n'
+        f"ค้นอย่างน้อย 2-3 ครั้งจากแหล่งต่างกัน (SET, Bloomberg, Reuters, Marketwatch, Thairath, Prachachat)\n\n"
+
+        f"## ขั้นตอนที่ 2 — สรุปข่าวล่าสุด 1 เดือน\n"
+        f"จากข่าวที่ค้นได้ สรุปแต่ละข่าวในรูปแบบ:\n"
+        f"📅 [วันที่] [หัวข้อข่าว]\n"
+        f"   ▸ ผลกระทบ: บวก/ลบ/กลาง — [อธิบาย 1-2 ประโยค]\n\n"
+        f"ถ้าไม่พบข่าวในช่วงนี้ ให้บอกชัดเจนว่า 'ไม่พบข่าวสำคัญใน 30 วันล่าสุด'\n\n"
+
+        f"## ขั้นตอนที่ 3 — วิเคราะห์ภาพรวม\n"
+        f"2-3 ประโยค สรุปทิศทางข่าวในรอบเดือนนี้ว่าเป็นบวก/ลบ/ผสม และส่งผลต่อ sentiment อย่างไร\n\n"
+
+        f"## ขั้นตอนที่ 4 — วิเคราะห์เทคนิค\n"
+        f"ข้อมูล indicators ณ วันนี้:\n"
+        f"  ราคา = {cur}{fmt(I.get('price',0))}  |  เปลี่ยนแปลง = {I.get('chg',0):.2f}%\n"
+        f"  RSI(14) = {I.get('rsi',50):.1f}  |  MACD Hist = {I.get('macd',0):.4f}\n"
+        f"  Bollinger %B = {I.get('bb_pct',0.5):.2f}  |  Stochastic = {I.get('stoch',50):.1f}\n"
+        f"  ADX = {I.get('adx',0):.1f}  (DI+ {I.get('dip',25):.1f} / DI- {I.get('dim',25):.1f})\n"
+        f"  SMA20 = {cur}{fmt(I.get('sma20',0))}  |  SMA50 = {cur}{fmt(I.get('sma50',0))}  |  SMA200 = {cur}{fmt(I.get('sma200',0))}\n"
+        f"  VWAP = {cur}{fmt(I.get('vwap',0))}  |  Volume Ratio = {I.get('vol_r',1):.2f}x\n"
+        f"  52W High = {cur}{fmt(I.get('h52',0))}  |  52W Low = {cur}{fmt(I.get('l52',0))}\n"
+        f"  คะแนนรวม = {S.get('sc',50)}/100  |  สัญญาณ = {sig_map.get(S.get('sig','hold'),'ถือ')}\n\n"
+        f"วิเคราะห์ว่า indicators เหล่านี้บอกอะไร และสอดคล้องหรือขัดแย้งกับข่าวล่าสุดอย่างไร\n\n"
+
+        f"## ขั้นตอนที่ 5 — คำแนะนำ\n"
+        f"  จุดซื้อแนะนำ = {cur}{S.get('entry',0)}\n"
+        f"  เป้าหมาย 1  = {cur}{S.get('t1',0)}  (+{S.get('up',0)}%)\n"
+        f"  เป้าหมาย 2  = {cur}{S.get('t2',0)}\n"
+        f"  Stop Loss   = {cur}{S.get('sl',0)}  (-{S.get('dn',0)}%)\n"
+        f"  R/R Ratio   = 1:{S.get('rr',0)}\n"
+        f"ระบุชัดว่า ควรซื้อ/ขาย/ถือ ตอนนี้ และเหตุผลจากทั้งข่าวและเทคนิค\n\n"
+
+        f"## ขั้นตอนที่ 6 — ความเสี่ยง\n"
+        f"ระบุ 2-3 ความเสี่ยงสำคัญที่อาจทำให้ราคาผิดไปจากที่วิเคราะห์\n\n"
+
+        f"ตอบภาษาไทย ใช้หัวข้อตามที่กำหนด กระชับแต่ครบถ้วน"
     )
-
-
 def analyze_with_gemini(sym, mkt, I, S, cur, api_key):
     """วิเคราะห์ด้วย Gemini API (Google Search grounding)"""
     prompt = build_analysis_prompt(sym, mkt, I, S, cur)
@@ -553,7 +582,7 @@ def analyze_with_gemini(sym, mkt, I, S, cur, api_key):
         "tools": [{"google_search": {}}],
         "generationConfig": {
             "temperature": 0.3,
-            "maxOutputTokens": 2048,
+            "maxOutputTokens": 3000,
         }
     }
     r = requests.post(url, headers={"Content-Type":"application/json"},
@@ -574,7 +603,7 @@ def analyze_with_claude(sym, mkt, I, S, cur):
     prompt = build_analysis_prompt(sym, mkt, I, S, cur)
     r = requests.post("https://api.anthropic.com/v1/messages",
         headers={"Content-Type":"application/json"},
-        json={"model":"claude-sonnet-4-20250514","max_tokens":1800,
+        json={"model":"claude-sonnet-4-20250514","max_tokens":3000,
               "tools":[{"type":"web_search_20250305","name":"web_search"}],
               "messages":[{"role":"user","content":prompt}]},
         timeout=90)
@@ -1067,7 +1096,7 @@ with t2:
             st.markdown("---")
             st.markdown("#### 📰 AI วิเคราะห์ + ข่าวสำคัญ 1 ปี")
             provider_label = "Gemini" if st.session_state.get("ai_provider","gemini")=="gemini" else "Claude"
-            with st.spinner(f"{provider_label} กำลังค้นข่าวและวิเคราะห์..."):
+            with st.spinner(f"{provider_label} กำลังค้นข่าว 1 เดือนล่าสุดและวิเคราะห์... (อาจใช้เวลา 20-40 วิ)"):
                 news = run_analysis(sym2, mkt_in, I2, S2, cur2)
             st.markdown(news)
 

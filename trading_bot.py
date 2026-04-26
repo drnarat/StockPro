@@ -432,88 +432,9 @@ for k,v in [("st_ok",False),("st_mkt",None),("st_rt",None),("st_inv",None),
         st.session_state[k] = v
 
 
-# ══════════════════════════════════════════════════════════════
-# SIDEBAR
-# ══════════════════════════════════════════════════════════════
-with st.sidebar:
-    st.markdown("## ⚙️ ตั้งค่า")
 
-    # ── AI Provider ──
-    st.markdown("### 🤖 AI วิเคราะห์ข่าว")
-    ai_provider = st.radio(
-        "เลือก AI",
-        ["gemini", "claude"],
-        format_func=lambda x: "Gemini (Google)" if x=="gemini" else "Claude (Anthropic)",
-        key="ai_provider",
-        horizontal=True,
-    )
-    if ai_provider == "gemini":
-        gemini_key = st.text_input(
-            "Gemini API Key",
-            type="password",
-            placeholder="AIza...",
-            key="gemini_key",
-            help="รับ key ฟรีที่ aistudio.google.com",
-        )
-        if gemini_key:
-            st.success("✅ Gemini key พร้อม")
-        else:
-            st.info("รับ API Key ฟรีที่\naistudio.google.com/apikey")
-    else:
-        st.caption("ใช้ Claude API built-in ไม่ต้องใส่ key เพิ่ม")
-
-    st.markdown("---")
-
-    # ── Settrade login ──
-    st.markdown("### Settrade API")
-    if st.session_state.st_ok:
-        st.success("✅ เชื่อมต่อแล้ว")
-        if st.button("ออกจากระบบ"):
-            st.session_state.update(st_ok=False, st_mkt=None, st_rt=None, st_inv=None)
-            st.rerun()
-    else:
-        with st.form("login_form"):
-            app_id     = st.text_input("APP_ID")
-            app_secret = st.text_input("APP_SECRET", type="password")
-            app_code   = st.text_input("APP_CODE",  value="SANDBOX")
-            broker_id  = st.text_input("BROKER_ID", value="SANDBOX")
-            submitted  = st.form_submit_button("🔗 เชื่อมต่อ")
-            if submitted:
-                if not SETTRADE_OK:
-                    st.error("settrade_v2 ไม่ได้ติดตั้ง\nตรวจ requirements.txt")
-                elif not app_id or not app_secret:
-                    st.error("กรอก APP_ID และ APP_SECRET")
-                else:
-                    try:
-                        inv = Investor(
-                            app_id=app_id.strip(),
-                            app_secret=app_secret.strip(),
-                            app_code=app_code.strip(),
-                            broker_id=broker_id.strip(),
-                        )
-                        mkt_api = inv.Market()
-                        rt_api  = inv.Realtime()
-                        test = mkt_api.get_candlestick("PTT", interval="1d", limit=3)
-                        if test:
-                            st.session_state.update(st_ok=True, st_mkt=mkt_api,
-                                                    st_rt=rt_api, st_inv=inv)
-                            st.success("✅ เชื่อมต่อสำเร็จ!")
-                            st.rerun()
-                        else:
-                            st.error("เชื่อมต่อได้แต่ดึงข้อมูลไม่ได้")
-                    except Exception as e:
-                        st.error(f"เชื่อมต่อไม่สำเร็จ:\n{e}")
-
-    st.markdown("---")
-    st.markdown("### Parameters")
-    rsi_os = st.slider("RSI Oversold",   15, 45, 35)
-    rsi_ob = st.slider("RSI Overbought", 55, 85, 65)
-    min_sc = st.slider("คะแนนขั้นต่ำ", 0, 100, 55)
-    min_rr = st.slider("R/R ขั้นต่ำ",   0.5, 3.0, 1.2, step=0.1)
-
-    st.markdown("---")
-    st.caption(f"settrade_v2: {'✅' if SETTRADE_OK else '❌ ต้องติดตั้ง'}")
-    st.caption(f"yfinance: {'✅' if YF_OK else '❌ ต้องติดตั้ง'}")
+# ── Settings moved to inline tab (mobile-friendly) ──────────
+# All sidebar config is now inside the ⚙️ tab
 
 
 # ── Main header ───────────────────────────────────────────────
@@ -526,13 +447,108 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-t1, t2, t3, t4 = st.tabs(["🔍 สแกนหุ้น","📊 วิเคราะห์","📡 Real-time","💼 Portfolio"])
+# ── SETUP CARD (แสดงในหน้าหลัก ไม่ต้องง้อ sidebar) ──────────
+with st.expander("⚙️ ตั้งค่า API Keys & Settrade", expanded=not st.session_state.get("setup_done")):
+    st.markdown("##### 🤖 AI วิเคราะห์ข่าว")
+    col_ai1, col_ai2 = st.columns(2)
+    with col_ai1:
+        ai_prov = st.radio(
+            "เลือก AI",
+            ["gemini","claude"],
+            format_func=lambda x: "Gemini (Google)" if x=="gemini" else "Claude (Anthropic)",
+            key="ai_provider",
+            horizontal=True,
+        )
+    with col_ai2:
+        if ai_prov == "gemini":
+            st.text_input(
+                "Gemini API Key",
+                type="password",
+                placeholder="AIza...",
+                key="gemini_key",
+                help="รับฟรีที่ aistudio.google.com/apikey",
+            )
+            if st.session_state.get("gemini_key"):
+                st.success("✅ Gemini key พร้อม")
+            else:
+                st.caption("รับ key ฟรีที่ aistudio.google.com/apikey")
+        else:
+            st.caption("ใช้ Claude built-in — ไม่ต้องใส่ key")
+
+    st.markdown("---")
+    st.markdown("##### 🏦 Settrade API (สำหรับหุ้น SET)")
+
+    if st.session_state.get("st_ok"):
+        st.success("✅ เชื่อมต่อ Settrade แล้ว")
+        if st.button("ออกจากระบบ Settrade", key="logout_main"):
+            st.session_state.update(st_ok=False,st_mkt=None,st_rt=None,st_inv=None)
+            st.rerun()
+    else:
+        s1, s2 = st.columns(2)
+        with s1:
+            _app_id     = st.text_input("APP_ID",     key="main_app_id")
+            _app_code   = st.text_input("APP_CODE",   key="main_app_code",   value="SANDBOX")
+        with s2:
+            _app_secret = st.text_input("APP_SECRET", key="main_app_secret", type="password")
+            _broker_id  = st.text_input("BROKER_ID",  key="main_broker_id",  value="SANDBOX")
+
+        if st.button("🔗 เชื่อมต่อ Settrade", key="connect_main"):
+            if not SETTRADE_OK:
+                st.error("settrade_v2 ไม่ได้ติดตั้ง — ตรวจ requirements.txt")
+            elif not _app_id or not _app_secret:
+                st.error("กรุณาใส่ APP_ID และ APP_SECRET")
+            else:
+                try:
+                    with st.spinner("กำลังเชื่อมต่อ..."):
+                        inv = Investor(
+                            app_id=_app_id.strip(),
+                            app_secret=_app_secret.strip(),
+                            app_code=_app_code.strip(),
+                            broker_id=_broker_id.strip(),
+                        )
+                        mkt_api = inv.Market()
+                        rt_api  = inv.Realtime()
+                        test = mkt_api.get_candlestick("PTT", interval="1d", limit=3)
+                        if test:
+                            st.session_state.update(
+                                st_ok=True, st_mkt=mkt_api,
+                                st_rt=rt_api, st_inv=inv,
+                                setup_done=True,
+                            )
+                            st.success("✅ เชื่อมต่อสำเร็จ!")
+                            st.rerun()
+                        else:
+                            st.error("เชื่อมต่อได้แต่ดึงข้อมูลไม่ได้")
+                except Exception as e:
+                    st.error("เชื่อมต่อไม่สำเร็จ: " + str(e))
+
+    st.markdown("---")
+    st.markdown("##### Parameters")
+    p1, p2, p3, p4 = st.columns(4)
+    with p1: rsi_os = st.slider("RSI Oversold",   15, 45, 35, key="p_rsi_os")
+    with p2: rsi_ob = st.slider("RSI Overbought", 55, 85, 65, key="p_rsi_ob")
+    with p3: min_sc = st.slider("คะแนนขั้นต่ำ", 0, 100, 55,  key="p_min_sc")
+    with p4: min_rr = st.slider("R/R ขั้นต่ำ",   0.5, 3.0, 1.2, step=0.1, key="p_min_rr")
+
+# Read params from session state (set by sliders above)
+rsi_os = st.session_state.get("p_rsi_os", 35)
+rsi_ob = st.session_state.get("p_rsi_ob", 65)
+min_sc = st.session_state.get("p_min_sc", 55)
+min_rr = st.session_state.get("p_min_rr", 1.2)
+
+t1, t2, t3, t4, t5 = st.tabs(["🔍 สแกนหุ้น","📊 วิเคราะห์","📡 Real-time","💼 Portfolio","⚙️ ตั้งค่า"])
 
 
 # ══════════════════════════════════════════════════════════════
 # TAB 1: SCANNER
 # ══════════════════════════════════════════════════════════════
 with t1:
+    # ค่าจากแท็บ ⚙️ ตั้งค่า
+    rsi_os = st.session_state.get("p_rsi_os", 35)
+    rsi_ob = st.session_state.get("p_rsi_ob", 65)
+    min_sc = st.session_state.get("p_min_sc", 55)
+    min_rr = st.session_state.get("p_min_rr", 1.2)
+
     ca, cb = st.columns(2)
     with ca: mkt_sel = st.selectbox("ตลาด", list(MARKETS.keys()), key="sc_mkt")
     with cb: sig_sel = st.selectbox("สัญญาณ", ["ทั้งหมด","ซื้อ","ซื้อ+เฝ้าระวัง","ขาย"], key="sc_sig")
@@ -614,6 +630,10 @@ with t1:
 # TAB 2: DEEP ANALYSIS
 # ══════════════════════════════════════════════════════════════
 with t2:
+    # ค่าจากแท็บ ⚙️ ตั้งค่า
+    rsi_os = st.session_state.get("p_rsi_os", 35)
+    rsi_ob = st.session_state.get("p_rsi_ob", 65)
+
     ca2, cb2 = st.columns([3,1])
     with ca2:
         sym_in = st.text_input("ชื่อหุ้น", value=st.session_state.get("da_sym",""),
@@ -784,6 +804,8 @@ with t2:
 # TAB 3: REAL-TIME
 # ══════════════════════════════════════════════════════════════
 with t3:
+    rsi_os = st.session_state.get("p_rsi_os", 35)
+    rsi_ob = st.session_state.get("p_rsi_ob", 65)
     st.markdown("### 📡 Real-time Watchlist")
     st.caption("SET = Settrade real-time จริง · US/CN = yfinance (delay 15 นาที)")
 
@@ -921,6 +943,149 @@ with t4:
                     st.dataframe(df_t, use_container_width=True)
                 else: st.info("ไม่มีข้อมูล trade history")
             except Exception as e: st.info(f"Trades: {e}")
+
+
+# ══════════════════════════════════════════════════════════════
+# TAB 5: SETTINGS (inline — mobile friendly)
+# ══════════════════════════════════════════════════════════════
+with t5:
+    st.markdown("### ⚙️ ตั้งค่าระบบ")
+
+    # ── AI Provider ────────────────────────────────────────────
+    st.markdown("#### 🤖 AI วิเคราะห์ข่าว")
+    ai_prov = st.radio(
+        "เลือก AI provider",
+        ["gemini", "claude"],
+        format_func=lambda x: "🟢 Gemini (Google) — แนะนำ" if x=="gemini" else "🟣 Claude (Anthropic)",
+        key="ai_provider",
+    )
+
+    if ai_prov == "gemini":
+        st.markdown("""
+        <div style="background:#0d1829;border:1px solid #1c2e4a;border-radius:10px;padding:14px;margin-bottom:10px">
+          <div style="font-size:13px;color:#5d7a9a;margin-bottom:8px">
+            Gemini ใช้ Google Search ค้นข่าวได้ฉับไว · Free 1,500 req/วัน
+          </div>
+          <div style="font-size:12px;color:#5d7a9a">
+            รับ API Key ฟรีที่ <b style="color:#dce8f5">aistudio.google.com/apikey</b>
+          </div>
+        </div>
+        """, unsafe_allow_html=True)
+        gemini_key_input = st.text_input(
+            "Gemini API Key",
+            type="password",
+            placeholder="AIzaSy...",
+            key="gemini_key",
+        )
+        if gemini_key_input:
+            if st.button("✅ ทดสอบ Gemini Key"):
+                try:
+                    test_url = (
+                        "https://generativelanguage.googleapis.com/v1beta/models/"
+                        "gemini-2.0-flash:generateContent?key=" + gemini_key_input
+                    )
+                    test_body = {
+                        "contents": [{"role":"user","parts":[{"text":"Reply with just: OK"}]}],
+                        "generationConfig": {"maxOutputTokens": 10}
+                    }
+                    r_test = requests.post(test_url,
+                        headers={"Content-Type":"application/json"},
+                        json=test_body, timeout=15)
+                    if r_test.status_code == 200:
+                        st.success("✅ Gemini API Key ใช้งานได้!")
+                    else:
+                        err = r_test.json()
+                        st.error(f"❌ Error {r_test.status_code}: {err.get('error',{}).get('message','')}")
+                except Exception as e:
+                    st.error(f"❌ ทดสอบไม่ได้: {e}")
+        else:
+            st.info("👆 ใส่ Gemini API Key แล้วกดทดสอบ")
+    else:
+        st.info("Claude API ใช้งาน built-in ในแอป ไม่ต้องใส่ key เพิ่ม")
+
+    st.markdown("---")
+
+    # ── Settrade Login ─────────────────────────────────────────
+    st.markdown("#### 📡 Settrade API")
+    if st.session_state.get("st_ok", False):
+        st.success("✅ เชื่อมต่อ Settrade แล้ว")
+        if st.button("🔓 ออกจากระบบ Settrade"):
+            st.session_state.update(st_ok=False, st_mkt=None, st_rt=None, st_inv=None)
+            st.rerun()
+    else:
+        st.markdown("""
+        <div style="background:#0d1829;border:1px solid #1c2e4a;border-radius:10px;padding:14px;margin-bottom:12px">
+          <div style="font-size:13px;color:#5d7a9a;line-height:1.7">
+            Settrade API ให้ราคา <b style="color:#dce8f5">real-time จริง</b> สำหรับหุ้น SET<br>
+            สมัครได้ที่ <b style="color:#dce8f5">developer.settrade.com</b>
+          </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        with st.form("settrade_form"):
+            st.markdown("**กรอก Credential จาก Settrade Developer Portal**")
+            c1f, c2f = st.columns(2)
+            with c1f:
+                f_app_id     = st.text_input("APP_ID",    placeholder="xxxxxxxx")
+                f_app_code   = st.text_input("APP_CODE",  value="SANDBOX")
+            with c2f:
+                f_app_secret = st.text_input("APP_SECRET", type="password", placeholder="••••••••")
+                f_broker_id  = st.text_input("BROKER_ID", value="SANDBOX")
+            submitted = st.form_submit_button("🔗 เชื่อมต่อ Settrade", use_container_width=True)
+            if submitted:
+                if not SETTRADE_OK:
+                    st.error("❌ settrade_v2 ไม่ได้ติดตั้ง\nตรวจ requirements.txt")
+                elif not f_app_id or not f_app_secret:
+                    st.warning("กรุณากรอก APP_ID และ APP_SECRET")
+                else:
+                    try:
+                        with st.spinner("กำลังเชื่อมต่อ..."):
+                            inv = Investor(
+                                app_id=f_app_id.strip(),
+                                app_secret=f_app_secret.strip(),
+                                app_code=f_app_code.strip(),
+                                broker_id=f_broker_id.strip(),
+                            )
+                            mkt_api = inv.Market()
+                            rt_api  = inv.Realtime()
+                            test    = mkt_api.get_candlestick("PTT", interval="1d", limit=3)
+                        if test:
+                            st.session_state.update(
+                                st_ok=True, st_mkt=mkt_api,
+                                st_rt=rt_api, st_inv=inv
+                            )
+                            st.success("✅ เชื่อมต่อ Settrade สำเร็จ!")
+                            st.rerun()
+                        else:
+                            st.error("เชื่อมต่อได้แต่ดึงข้อมูลไม่ได้ — ตรวจ credential")
+                    except Exception as e:
+                        st.error(f"เชื่อมต่อไม่สำเร็จ:\n{e}")
+
+    st.markdown("---")
+
+    # ── Parameters ─────────────────────────────────────────────
+    st.markdown("#### 📐 Parameters การสแกน")
+    pc1, pc2 = st.columns(2)
+    with pc1:
+        rsi_os = st.slider("RSI Oversold",   15, 45, 35, key="p_rsi_os")
+        min_sc = st.slider("คะแนนขั้นต่ำ", 0, 100, 55, key="p_min_sc")
+    with pc2:
+        rsi_ob = st.slider("RSI Overbought", 55, 85, 65, key="p_rsi_ob")
+        min_rr = st.slider("R/R ขั้นต่ำ",   0.5, 3.0, 1.2, step=0.1, key="p_min_rr")
+
+    st.markdown("---")
+
+    # ── Library status ─────────────────────────────────────────
+    st.markdown("#### 📦 สถานะ Library")
+    st.markdown(f"""
+    | Library | สถานะ |
+    |---|---|
+    | settrade-v2 | {'✅ พร้อม' if SETTRADE_OK else '❌ ยังไม่ได้ติดตั้ง'} |
+    | yfinance | {'✅ พร้อม' if YF_OK else '❌ ยังไม่ได้ติดตั้ง'} |
+    | Settrade connection | {'✅ เชื่อมต่อแล้ว' if st.session_state.get("st_ok") else '⚠️ ยังไม่เชื่อมต่อ'} |
+    | AI provider | {'Gemini' if st.session_state.get('ai_provider','gemini')=='gemini' else 'Claude'} |
+    """)
+
 
 st.markdown('<div style="text-align:center;font-size:11px;color:#1c2e4a;margin-top:24px">'
             'ใช้เพื่อการศึกษาเท่านั้น · ไม่ใช่คำแนะนำการลงทุน</div>',

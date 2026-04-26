@@ -2,3 +2,4 @@ settrade-v2
 pandas
 pandas-ta
 google-generativeai
+plotly

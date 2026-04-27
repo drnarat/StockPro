@@ -41,10 +41,17 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ── Library status banner ─────────────────────────────────────
-if not YF_OK:
-    st.error("❌ yfinance โหลดไม่ได้ — ตรวจ requirements.txt")
-# settrade ไม่แสดง banner เพราะเป็น optional
+# ── Startup: ถ้ายังไม่ได้เชื่อมต่อ Settrade แสดงหน้า Login ก่อน ──
+if not SETTRADE_OK:
+    st.error("""❌ settrade-v2 ไม่ได้ติดตั้ง
+
+รันคำสั่งนี้ใน CMD/Terminal ก่อน:
+```
+pip install settrade-v2
+streamlit run app.py
+```
+""")
+    st.stop()
 
 # ── CSS ──────────────────────────────────────────────────────
 st.markdown("""
@@ -1016,186 +1023,124 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ── SETUP CARD (แสดงในหน้าหลัก ไม่ต้องง้อ sidebar) ──────────
-with st.expander("⚙️ ตั้งค่า API Keys & Settrade", expanded=not st.session_state.get("setup_done")):
-    st.markdown("##### 🤖 AI วิเคราะห์ข่าว")
-    col_ai1, col_ai2 = st.columns(2)
-    with col_ai1:
-        ai_prov = st.radio(
-            "เลือก AI",
+# ══════════════════════════════════════════════════════════════
+# SETTRADE LOGIN GATE — แสดงก่อนเข้าใช้งาน
+# ══════════════════════════════════════════════════════════════
+if not st.session_state.get("st_ok"):
+    st.markdown("""
+    <div style="text-align:center;padding:10px 0 20px">
+      <div style="font-size:16px;color:#818cf8;font-weight:500">
+        🔐 กรอก Settrade API Credential เพื่อเริ่มใช้งาน
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    with st.form("login_gate"):
+        lg1, lg2 = st.columns(2)
+        with lg1:
+            lg_id    = st.text_input("APP_ID",     placeholder="กรอก APP_ID จาก developer.settrade.com")
+            lg_sec   = st.text_input("APP_SECRET", placeholder="กรอก APP_SECRET", type="password")
+            lg_acct  = st.text_input("ACCOUNT_NO", placeholder="เช่น Narats-E")
+        with lg2:
+            lg_code  = st.text_input("APP_CODE",   value="SANDBOX")
+            lg_brok  = st.text_input("BROKER_ID",  value="SANDBOX")
+            st.markdown("""
+            <div style="background:rgba(99,102,241,.08);border:1.5px solid #c7d2fe;
+              border-radius:10px;padding:12px;font-size:13px;color:#818cf8;line-height:1.8;margin-top:8px">
+              📌 ข้อมูลจาก<br>
+              <b style="color:#4f46e5">developer.settrade.com</b><br>
+              SANDBOX = ทดสอบ<br>
+              ใส่รหัสโบรกเกอร์จริงเพื่อดูราคา real-time
+            </div>
+            """, unsafe_allow_html=True)
+
+        submitted = st.form_submit_button("🔗 เชื่อมต่อ Settrade", use_container_width=True)
+        if submitted:
+            if not lg_id.strip() or not lg_sec.strip():
+                st.warning("กรุณาใส่ APP_ID และ APP_SECRET")
+            else:
+                try:
+                    with st.spinner("กำลังเชื่อมต่อ Settrade..."):
+                        inv = Investor(
+                            app_id=lg_id.strip(),
+                            app_secret=lg_sec.strip(),
+                            app_code=lg_code.strip() if lg_code.strip() else "SANDBOX",
+                            broker_id=lg_brok.strip() if lg_brok.strip() else "SANDBOX",
+                        )
+                        # Detect API version
+                        mkt_api = rt_api = None
+                        if hasattr(inv, 'Equity'):
+                            try:    mkt_api = inv.Equity(lg_acct.strip()) if lg_acct.strip() else inv.Equity("")
+                            except TypeError: mkt_api = inv.Equity()
+                        elif hasattr(inv, 'MarketData'):
+                            mkt_api = inv.MarketData()
+                        elif hasattr(inv, 'Market'):
+                            mkt_api = inv.Market()
+
+                        if hasattr(inv, 'RealtimeDataConnection'):
+                            try:    rt_api = inv.RealtimeDataConnection()
+                            except Exception: rt_api = None
+                        elif hasattr(inv, 'Realtime'):
+                            try:    rt_api = inv.Realtime()
+                            except Exception: rt_api = None
+
+                        if mkt_api is None:
+                            avail = [a for a in dir(inv) if not a.startswith('_')]
+                            raise AttributeError(f"ไม่พบ Market API\nattributes: {avail}")
+
+                        st.session_state.update(
+                            st_ok=True, st_mkt=mkt_api, st_rt=rt_api, st_inv=inv,
+                            setup_done=True, account_no=lg_acct.strip(),
+                            app_id_saved="", app_secret_saved="",
+                        )
+                        st.success("✅ เชื่อมต่อสำเร็จ!")
+                        st.rerun()
+                except AttributeError as e:
+                    st.error(str(e))
+                except Exception as e:
+                    err = str(e)
+                    st.error(f"เชื่อมต่อไม่สำเร็จ: {err}")
+                    if "account_no" in err.lower() or "positional" in err.lower():
+                        st.info("💡 กรุณาใส่ ACCOUNT_NO ด้วย เช่น Narats-E")
+                    elif "401" in err:
+                        st.warning("APP_ID หรือ APP_SECRET ไม่ถูกต้อง")
+                    elif "403" in err:
+                        st.warning("APP_CODE หรือ BROKER_ID ไม่ถูกต้อง")
+    st.stop()
+
+# ── Connected — แสดง status bar ──────────────────────────────
+acct_disp = st.session_state.get("account_no","")
+with st.expander(f"✅ เชื่อมต่อ Settrade แล้ว {('· บัญชี: '+acct_disp) if acct_disp else ''}", expanded=False):
+    col_s1, col_s2 = st.columns([3,1])
+    with col_s1:
+        st.markdown("##### 🤖 AI วิเคราะห์ข่าว")
+        ai_prov = st.radio("เลือก AI provider",
             ["gemini","claude"],
-            format_func=lambda x: "Gemini (Google)" if x=="gemini" else "Claude (Anthropic)",
-            key="ai_provider",
-            horizontal=True,
-        )
-    with col_ai2:
+            format_func=lambda x: "🟢 Gemini (Google) — แนะนำ" if x=="gemini" else "🟣 Claude (Anthropic)",
+            key="ai_provider", horizontal=True)
         if ai_prov == "gemini":
-            st.text_input(
-                "Gemini API Key",
-                type="password",
-                placeholder="AIza...",
-                key="gemini_key",
-                help="รับฟรีที่ aistudio.google.com/apikey",
-            )
-            if st.session_state.get("gemini_key"):
+            gk = st.text_input("Gemini API Key", type="password",
+                placeholder="AIzaSy...", key="gemini_key")
+            if gk:
                 st.success("✅ Gemini key พร้อม")
             else:
                 st.caption("รับ key ฟรีที่ aistudio.google.com/apikey")
         else:
-            st.caption("ใช้ Claude built-in — ไม่ต้องใส่ key")
-
-    st.markdown("---")
-    st.markdown("##### 🏦 Settrade API (สำหรับหุ้น SET)")
-
-    if st.session_state.get("st_ok"):
-        acc = st.session_state.get("account_no","")
-        st.success("✅ เชื่อมต่อ Settrade แล้ว" + (f"  ·  บัญชี: {acc}" if acc else ""))
-        if st.button("ออกจากระบบ Settrade", key="logout_main"):
-            st.session_state.update(st_ok=False,st_mkt=None,st_rt=None,st_inv=None)
+            st.caption("Claude API built-in ไม่ต้องใส่ key")
+    with col_s2:
+        if st.button("🔓 ออกจากระบบ", key="logout_top"):
+            st.session_state.update(
+                st_ok=False, st_mkt=None, st_rt=None, st_inv=None,
+                setup_done=False, account_no=""
+            )
             st.rerun()
-    else:
-        fa, fb = st.columns(2)
-        with fa:
-            _app_id     = st.text_input("APP_ID",     key="main_app_id",     placeholder="กรอก APP_ID จาก developer.settrade.com")
-            _app_secret = st.text_input("APP_SECRET", key="main_app_secret", placeholder="กรอก APP_SECRET", type="password")
-            _account_no = st.text_input("ACCOUNT_NO", key="main_account_no", placeholder="เช่น Narats-E")
-        with fb:
-            _app_code   = st.text_input("APP_CODE",   key="main_app_code",   value="SANDBOX")
-            _broker_id  = st.text_input("BROKER_ID",  key="main_broker_id",  value="SANDBOX")
-            st.caption("SANDBOX = ทดสอบ\nใส่รหัสโบรกเกอร์จริงเพื่อดู portfolio จริง")
 
-        if st.button("🔗 เชื่อมต่อ Settrade", key="connect_main", use_container_width=True):
-            if not SETTRADE_OK:
-                st.error("settrade_v2 ไม่ได้ติดตั้ง — ตรวจ requirements.txt")
-            elif not _app_id.strip() or not _app_secret.strip():
-                st.warning("กรุณาใส่ APP_ID และ APP_SECRET")
-            else:
-                try:
-                    with st.spinner("กำลังเชื่อมต่อ..."):
-                        inv = Investor(
-                            app_id=_app_id.strip(),
-                            app_secret=_app_secret.strip(),
-                            app_code=_app_code.strip(),
-                            broker_id=_broker_id.strip(),
-                        )
-                        # settrade-v2 API — ใช้ตาม attributes จริงที่ตรวจพบ
-                        # ['Equity','MarketData','RealtimeDataConnection','Derivatives',...]
-                        mkt_api = None
-                        rt_api  = None
-
-                        acct_no = _account_no.strip()
-
-                        if hasattr(inv, 'Equity'):
-                            # version ใหม่ต้องส่ง account_no
-                            try:
-                                mkt_api = inv.Equity(acct_no) if acct_no else inv.Equity("")
-                            except TypeError:
-                                mkt_api = inv.Equity()
-                        elif hasattr(inv, 'MarketData'):
-                            try:
-                                mkt_api = inv.MarketData(acct_no) if acct_no else inv.MarketData()
-                            except TypeError:
-                                mkt_api = inv.MarketData()
-                        elif hasattr(inv, 'Market'):
-                            mkt_api = inv.Market()
-                        elif hasattr(inv, 'market'):
-                            mkt_api = inv.market
-
-                        if hasattr(inv, 'RealtimeDataConnection'):
-                            try:
-                                rt_api = inv.RealtimeDataConnection()
-                            except Exception:
-                                rt_api = None
-                        elif hasattr(inv, 'Realtime'):
-                            try:
-                                rt_api = inv.Realtime()
-                            except Exception:
-                                rt_api = None
-                        elif hasattr(inv, 'realtime'):
-                            rt_api = inv.realtime
-                        if mkt_api is None:
-                            avail = [a for a in dir(inv) if not a.startswith('_')]
-                            raise AttributeError(
-                                f"ไม่พบ Market API\n"
-                                f"settrade-v2 version นี้มี attributes: {avail}"
-                            )
-
-                        # Test connection — ลองทุก method ที่อาจมี
-                        test = None
-                        test_methods = [
-                            ('get_candlestick',          lambda: mkt_api.get_candlestick("PTT", interval="1d", limit=3)),
-                            ('get_price_chart_by_period',lambda: mkt_api.get_price_chart_by_period("PTT", "1D")),
-                            ('get_quotation_range',      lambda: mkt_api.get_quotation_range("PTT", "2025-01-01", "2025-01-31")),
-                            ('get_security_info',        lambda: mkt_api.get_security_info("PTT")),
-                        ]
-                        for method_name, method_call in test_methods:
-                            if hasattr(mkt_api, method_name):
-                                try:
-                                    test = method_call()
-                                    if test:
-                                        break
-                                except Exception:
-                                    pass
-                        if test is None:
-                            # ถ้าทดสอบไม่ได้แต่ object มีอยู่ ถือว่าสำเร็จ
-                            test = True
-
-                    if mkt_api:
-                        st.session_state.update(
-                            st_ok=True,
-                            st_mkt=mkt_api,
-                            st_rt=rt_api,
-                            st_inv=inv,
-                            setup_done=True,
-                            account_no=_account_no.strip(),
-                            app_id_saved="",      # ไม่บันทึก credential
-                            app_secret_saved="",  # ไม่บันทึก credential
-                        )
-                        st.success("✅ เชื่อมต่อสำเร็จ!")
-                        st.rerun()
-                    else:
-                        st.error("เชื่อมต่อได้แต่ดึงข้อมูลไม่ได้ — ตรวจ credential")
-                except AttributeError as e:
-                    st.error(str(e))
-                    st.code("pip install settrade-v2 --upgrade", language="bash")
-                except TypeError as e:
-                    # แสดง signature จริงเพื่อ debug
-                    import inspect
-                    st.error("TypeError: " + str(e))
-                    try:
-                        inv2 = Investor(
-                            app_id=_app_id.strip(),
-                            app_secret=_app_secret.strip(),
-                            app_code=_app_code.strip(),
-                            broker_id=_broker_id.strip(),
-                        )
-                        if hasattr(inv2, 'Equity'):
-                            sig = str(inspect.signature(inv2.Equity))
-                            st.info(f"Equity() signature: {sig}")
-                        avail = [a for a in dir(inv2) if not a.startswith('_')]
-                        st.info(f"Available: {avail}")
-                    except Exception as e2:
-                        st.error("Debug error: " + str(e2))
-                except Exception as e:
-                    err = str(e)
-                    st.error("เชื่อมต่อไม่สำเร็จ: " + err)
-                    if "401" in err or "unauthorized" in err.lower():
-                        st.warning("APP_ID หรือ APP_SECRET ไม่ถูกต้อง")
-                    elif "403" in err or "forbidden" in err.lower():
-                        st.warning("APP_CODE หรือ BROKER_ID ไม่ถูกต้อง")
-
-    st.markdown("---")
-    st.markdown("##### Parameters")
-    p1, p2, p3, p4 = st.columns(4)
-    with p1: rsi_os = st.slider("RSI Oversold",   15, 45, 35, key="p_rsi_os")
-    with p2: rsi_ob = st.slider("RSI Overbought", 55, 85, 65, key="p_rsi_ob")
-    with p3: min_sc = st.slider("คะแนนขั้นต่ำ", 0, 100, 55,  key="p_min_sc")
-    with p4: min_rr = st.slider("R/R ขั้นต่ำ",   0.5, 3.0, 1.2, step=0.1, key="p_min_rr")
-
-# Read params from session state (set by sliders above)
+# ── Read parameters from session state ───────────────────────
 rsi_os = st.session_state.get("p_rsi_os", 35)
 rsi_ob = st.session_state.get("p_rsi_ob", 65)
 min_sc = st.session_state.get("p_min_sc", 55)
 min_rr = st.session_state.get("p_min_rr", 1.2)
+
 
 t1, t2, t3, t4 = st.tabs(["🔍 สแกนหุ้น","📊 วิเคราะห์","📡 Real-time","💼 Portfolio"])
 

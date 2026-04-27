@@ -17,34 +17,21 @@ import time
 from datetime import datetime
 
 # ── Library checks ───────────────────────────────────────────
-# settrade-v2 — ถ้า import ไม่ได้ให้ลอง install ก่อน
+# settrade-v2 — optional (ไม่อยู่บน PyPI สาธารณะ ต้องติดตั้งแยก)
+# ถ้าไม่มี จะยังใช้ US/CN ผ่าน yfinance ได้ปกติ
 SETTRADE_OK = False
 try:
     from settrade_v2 import Investor
     SETTRADE_OK = True
-except ImportError:
-    try:
-        import subprocess, sys
-        subprocess.check_call([sys.executable, "-m", "pip", "install",
-                               "settrade-v2", "--quiet", "--no-warn-script-location"])
-        from settrade_v2 import Investor
-        SETTRADE_OK = True
-    except Exception:
-        SETTRADE_OK = False
+except Exception:
+    SETTRADE_OK = False
 
 YF_OK = False
 try:
     import yfinance as yf
     YF_OK = True
-except ImportError:
-    try:
-        import subprocess, sys
-        subprocess.check_call([sys.executable, "-m", "pip", "install",
-                               "yfinance", "--quiet"])
-        import yfinance as yf
-        YF_OK = True
-    except Exception:
-        YF_OK = False
+except Exception:
+    YF_OK = False
 
 # ── Page config ──────────────────────────────────────────────
 st.set_page_config(
@@ -56,9 +43,8 @@ st.set_page_config(
 
 # ── Library status banner ─────────────────────────────────────
 if not YF_OK:
-    st.warning("⚠️ yfinance ไม่สามารถโหลดได้ — US/CN stocks จะไม่ทำงาน")
-if not SETTRADE_OK:
-    st.info("ℹ️ settrade-v2 ไม่ได้ติดตั้ง — SET จะไม่ทำงาน ใส่ในแท็บ ⚙️ เพื่อเชื่อมต่อ")
+    st.error("❌ yfinance โหลดไม่ได้ — ตรวจ requirements.txt")
+# settrade ไม่แสดง banner เพราะเป็น optional
 
 # ── CSS ──────────────────────────────────────────────────────
 st.markdown("""

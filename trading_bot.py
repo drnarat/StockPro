@@ -347,197 +347,202 @@ def calc_ind(df):
     """คำนวณ indicators ครบทุกตัว จาก OHLCV dataframe"""
     if df is None or len(df) < 30:
         return {}
-    c  = df["close"].astype(float)
-    h  = df["high"].astype(float)
-    lo = df["low"].astype(float)
-    v  = df["volume"].astype(float)
-    n  = len(c)
-    p  = float(c.iloc[-1])
+    try:
+        # Flatten MultiIndex ถ้ามี แล้ว force float
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = [col[0].lower() if isinstance(col, tuple) else str(col).lower()
+                          for col in df.columns]
+        # squeeze ถ้า column เป็น DataFrame แทน Series
+        def to_series(col):
+            s = df[col]
+            if isinstance(s, pd.DataFrame):
+                s = s.iloc[:, 0]
+            return s.astype(float).reset_index(drop=True)
 
-    def sma(s, per): return float(s.rolling(per).mean().iloc[-1]) if len(s) >= per else p
-    def ema(s, per): return float(s.ewm(span=per, adjust=False).mean().iloc[-1])
-    def safe(val, default=0.0):
-        try: return float(val) if not (val != val) else default
-        except: return default
+        c  = to_series("close")
+        h  = to_series("high")
+        lo = to_series("low")
+        v  = to_series("volume")
+        n  = len(c)
+        p  = float(c.iloc[-1])
 
-    # ── Moving Averages ──────────────────────────────────────
-    sma5   = sma(c, min(5,n));   sma10 = sma(c, min(10,n))
-    sma20  = sma(c, min(20,n));  sma50 = sma(c, min(50,n))
-    sma200 = sma(c, min(200,n))
-    ema9   = ema(c, 9);  ema12 = ema(c, 12)
-    ema20  = ema(c, 20); ema26 = ema(c, 26)
-    ema50  = ema(c, 50); ema200 = ema(c, 200)
+        def sma(s, per):
+            try: return float(s.rolling(per).mean().iloc[-1])
+            except: return p
+        def ema(s, per):
+            try: return float(s.ewm(span=per, adjust=False).mean().iloc[-1])
+            except: return float(s.iloc[-1]) if len(s)>0 else p
+        def safe(val, default=0.0):
+            try:
+                v2 = float(val)
+                return v2 if v2 == v2 else default  # NaN check
+            except: return default
 
-    # ── MACD ────────────────────────────────────────────────
-    macd_line   = ema12 - ema26
-    _macd_series = pd.Series([
-        ema(c.iloc[max(0,i-35):i+1], 12) - ema(c.iloc[max(0,i-35):i+1], 26)
-        for i in range(n)
-    ])
-    macd_signal = ema(_macd_series, 9)
-    macd_hist   = macd_line - macd_signal
+        # ── Moving Averages ──────────────────────────────────────
+        sma5   = sma(c, min(5,n));   sma10 = sma(c, min(10,n))
+        sma20  = sma(c, min(20,n));  sma50 = sma(c, min(50,n))
+        sma200 = sma(c, min(200,n))
+        ema9   = ema(c, 9);   ema12 = ema(c, 12)
+        ema20_ = ema(c, 20);  ema26 = ema(c, 26)
+        ema50_ = ema(c, 50);  ema200_= ema(c, 200)
 
-    # ── RSI ─────────────────────────────────────────────────
-    d    = c.diff()
-    gain = d.clip(lower=0).rolling(14).mean()
-    loss = (-d.clip(upper=0)).rolling(14).mean()
-    rs   = gain / (loss + 1e-9)
-    rsi  = safe(100 - 100 / (1 + rs.iloc[-1]))
-    # RSI ระยะสั้น
-    rsi6  = safe(100 - 100 / (1 + d.clip(lower=0).rolling(6).mean().iloc[-1] /
-                               ((-d.clip(upper=0)).rolling(6).mean().iloc[-1] + 1e-9)))
+        # ── MACD ────────────────────────────────────────────────
+        macd_line   = ema12 - ema26
+        _ms = pd.Series([
+            ema(c.iloc[max(0,i-35):i+1], 12) - ema(c.iloc[max(0,i-35):i+1], 26)
+            for i in range(n)
+        ])
+        macd_signal = ema(_ms, 9)
+        macd_hist   = macd_line - macd_signal
 
-    # ── Bollinger Bands ──────────────────────────────────────
-    bb_mid = sma(c, 20)
-    bb_std = safe(c.rolling(20).std().iloc[-1])
-    bb_up  = bb_mid + 2 * bb_std
-    bb_dn  = bb_mid - 2 * bb_std
-    bb_w   = (bb_up - bb_dn) / (bb_mid + 1e-9)          # Bandwidth
-    bb_pct = (p - bb_dn) / (bb_up - bb_dn + 1e-9)       # %B
+        # ── RSI ─────────────────────────────────────────────────
+        d    = c.diff()
+        gain = d.clip(lower=0).rolling(14).mean()
+        loss = (-d.clip(upper=0)).rolling(14).mean()
+        rsi_s= 100 - 100 / (1 + gain / (loss + 1e-9))
+        rsi  = safe(rsi_s.iloc[-1], 50)
+        rsi6 = safe(
+            100 - 100 / (1 + d.clip(lower=0).rolling(6).mean().iloc[-1] /
+                         ((-d.clip(upper=0)).rolling(6).mean().iloc[-1] + 1e-9)), 50)
 
-    # ── Stochastic %K %D ────────────────────────────────────
-    hh14   = safe(h.rolling(14).max().iloc[-1], p)
-    ll14   = safe(lo.rolling(14).min().iloc[-1], p)
-    stochK = (p - ll14) / (hh14 - ll14 + 1e-9) * 100
-    stochD = safe(pd.Series(
-        [(float(c.iloc[i]) - float(lo.rolling(14).min().iloc[i])) /
-         (float(h.rolling(14).max().iloc[i]) - float(lo.rolling(14).min().iloc[i]) + 1e-9) * 100
-         for i in range(n)]
-    ).rolling(3).mean().iloc[-1])
+        # ── Bollinger Bands ──────────────────────────────────────
+        bb_mid = sma(c, 20)
+        bb_std = safe(c.rolling(20).std().iloc[-1], 0)
+        bb_up  = bb_mid + 2 * bb_std
+        bb_dn  = bb_mid - 2 * bb_std
+        bb_w   = (bb_up - bb_dn) / (bb_mid + 1e-9)
+        bb_pct = (p - bb_dn) / (bb_up - bb_dn + 1e-9)
 
-    # ── ATR ─────────────────────────────────────────────────
-    tr   = pd.concat([h - lo,
-                      (h - c.shift()).abs(),
-                      (lo - c.shift()).abs()], axis=1).max(axis=1)
-    atr  = safe(tr.rolling(14).mean().iloc[-1], p * 0.02)
-    atr7 = safe(tr.rolling(7).mean().iloc[-1],  p * 0.015)
+        # ── Stochastic ───────────────────────────────────────────
+        hh14  = safe(h.rolling(14).max().iloc[-1], p)
+        ll14  = safe(lo.rolling(14).min().iloc[-1], p)
+        stochK= (p - ll14) / (hh14 - ll14 + 1e-9) * 100
+        _stoch_series = pd.Series([
+            (float(c.iloc[i]) - safe(lo.rolling(14).min().iloc[i], float(c.iloc[i]))) /
+            (safe(h.rolling(14).max().iloc[i], float(c.iloc[i])) -
+             safe(lo.rolling(14).min().iloc[i], float(c.iloc[i])) + 1e-9) * 100
+            for i in range(n)
+        ])
+        stochD = safe(_stoch_series.rolling(3).mean().iloc[-1], stochK)
 
-    # ── ADX / DI+ / DI- ─────────────────────────────────────
-    dmp  = (h - h.shift()).clip(lower=0)
-    dmm  = (lo.shift() - lo).clip(lower=0)
-    dmp2 = dmp.where(dmp > dmm, 0)
-    dmm2 = dmm.where(dmm > dmp, 0)
-    a14  = tr.rolling(14).mean()
-    dip  = safe((dmp2.rolling(14).mean() / (a14 + 1e-9) * 100).iloc[-1])
-    dim  = safe((dmm2.rolling(14).mean() / (a14 + 1e-9) * 100).iloc[-1])
-    adx  = safe(abs(dip - dim) / (dip + dim + 1e-9) * 100)
+        # ── ATR ─────────────────────────────────────────────────
+        tr = pd.concat([
+            h - lo,
+            (h - c.shift()).abs(),
+            (lo - c.shift()).abs()
+        ], axis=1).max(axis=1)
+        atr  = safe(tr.rolling(14).mean().iloc[-1], p * 0.02)
+        atr7 = safe(tr.rolling(7).mean().iloc[-1],  p * 0.015)
 
-    # ── CCI (Commodity Channel Index) ───────────────────────
-    tp_s  = (h + lo + c) / 3
-    cci   = safe((tp_s.iloc[-1] - tp_s.rolling(20).mean().iloc[-1]) /
-                 (0.015 * tp_s.rolling(20).std().iloc[-1] + 1e-9))
+        # ── ADX ─────────────────────────────────────────────────
+        dmp  = (h - h.shift()).clip(lower=0)
+        dmm  = (lo.shift() - lo).clip(lower=0)
+        dmp2 = dmp.where(dmp > dmm, 0)
+        dmm2 = dmm.where(dmm > dmp, 0)
+        a14  = tr.rolling(14).mean()
+        dip  = safe((dmp2.rolling(14).mean() / (a14 + 1e-9) * 100).iloc[-1])
+        dim  = safe((dmm2.rolling(14).mean() / (a14 + 1e-9) * 100).iloc[-1])
+        adx  = safe(abs(dip - dim) / (dip + dim + 1e-9) * 100)
 
-    # ── Williams %R ─────────────────────────────────────────
-    willr = safe((hh14 - p) / (hh14 - ll14 + 1e-9) * -100)
+        # ── CCI ─────────────────────────────────────────────────
+        tp_s = (h + lo + c) / 3
+        cci  = safe(
+            (float(tp_s.iloc[-1]) - float(tp_s.rolling(20).mean().iloc[-1])) /
+            (0.015 * float(tp_s.rolling(20).std().iloc[-1]) + 1e-9))
 
-    # ── MFI (Money Flow Index) ───────────────────────────────
-    tp_mfi   = (h + lo + c) / 3
-    mf       = tp_mfi * v
-    pos_mf   = mf.where(tp_mfi > tp_mfi.shift(), 0).rolling(14).sum()
-    neg_mf   = mf.where(tp_mfi < tp_mfi.shift(), 0).rolling(14).sum()
-    mfi      = safe(100 - 100 / (1 + pos_mf.iloc[-1] / (neg_mf.iloc[-1] + 1e-9)))
+        # ── Williams %R ──────────────────────────────────────────
+        willr = safe((hh14 - p) / (hh14 - ll14 + 1e-9) * -100)
 
-    # ── OBV (On-Balance Volume) ──────────────────────────────
-    obv_vals = []
-    obv_cur  = 0
-    for i in range(n):
-        if i == 0:
-            obv_vals.append(0)
-        elif float(c.iloc[i]) > float(c.iloc[i-1]):
-            obv_cur += float(v.iloc[i])
+        # ── MFI ─────────────────────────────────────────────────
+        tp_mfi = (h + lo + c) / 3
+        mf     = tp_mfi * v
+        pos_mf = mf.where(tp_mfi > tp_mfi.shift(), 0).rolling(14).sum()
+        neg_mf = mf.where(tp_mfi <= tp_mfi.shift(), 0).rolling(14).sum()
+        mfi    = safe(100 - 100 / (1 + float(pos_mf.iloc[-1]) /
+                                   (float(neg_mf.iloc[-1]) + 1e-9)))
+
+        # ── OBV ─────────────────────────────────────────────────
+        obv_cur = 0.0
+        obv_vals= [0.0]
+        for i in range(1, n):
+            ci, ci_prev = float(c.iloc[i]), float(c.iloc[i-1])
+            vi = float(v.iloc[i])
+            obv_cur += vi if ci > ci_prev else (-vi if ci < ci_prev else 0)
             obv_vals.append(obv_cur)
-        elif float(c.iloc[i]) < float(c.iloc[i-1]):
-            obv_cur -= float(v.iloc[i])
-            obv_vals.append(obv_cur)
-        else:
-            obv_vals.append(obv_cur)
-    obv_s    = pd.Series(obv_vals)
-    obv      = safe(obv_s.iloc[-1])
-    obv_ema  = ema(obv_s, 20)
-    obv_trend = "up" if obv > obv_ema else "down"   # OBV vs EMA20
+        obv_s    = pd.Series(obv_vals)
+        obv      = obv_vals[-1]
+        obv_ema  = ema(obv_s, 20)
+        obv_trend= "up" if obv > obv_ema else "down"
 
-    # ── ROC (Rate of Change) ─────────────────────────────────
-    roc10 = safe((p / float(c.iloc[-11]) - 1) * 100) if n > 10 else 0
-    roc20 = safe((p / float(c.iloc[-21]) - 1) * 100) if n > 20 else 0
+        # ── ROC ─────────────────────────────────────────────────
+        roc10 = safe((p / float(c.iloc[-11]) - 1) * 100) if n > 10 else 0
+        roc20 = safe((p / float(c.iloc[-21]) - 1) * 100) if n > 20 else 0
 
-    # ── VWAP ────────────────────────────────────────────────
-    vwap  = safe((tp_s * v).rolling(20).sum().iloc[-1] /
-                 (v.rolling(20).sum().iloc[-1] + 1e-9))
+        # ── VWAP ────────────────────────────────────────────────
+        vwap = safe(float((tp_s * v).rolling(20).sum().iloc[-1]) /
+                    (float(v.rolling(20).sum().iloc[-1]) + 1e-9))
 
-    # ── Volume ──────────────────────────────────────────────
-    vol_avg20  = safe(v.rolling(20).mean().iloc[-1], 1)
-    vol_avg5   = safe(v.rolling(5).mean().iloc[-1],  1)
-    vol_r      = safe(float(v.iloc[-1]) / (vol_avg20 + 1))
-    vol_r5     = safe(vol_avg5 / (vol_avg20 + 1))   # short vs long avg
+        # ── Volume ──────────────────────────────────────────────
+        vol_avg20 = safe(float(v.rolling(20).mean().iloc[-1]), 1)
+        vol_avg5  = safe(float(v.rolling(5).mean().iloc[-1]),  1)
+        vol_r     = safe(float(v.iloc[-1]) / (vol_avg20 + 1))
+        vol_r5    = safe(vol_avg5 / (vol_avg20 + 1))
 
-    # ── 52-Week / Price Position ────────────────────────────
-    w    = min(252, n)
-    h52  = safe(h.rolling(w).max().iloc[-1], p)
-    l52  = safe(lo.rolling(w).min().iloc[-1], p)
-    pct_from_h52 = (p / h52 - 1) * 100 if h52 > 0 else 0
-    pct_from_l52 = (p / l52 - 1) * 100 if l52 > 0 else 0
+        # ── 52W ─────────────────────────────────────────────────
+        w    = min(252, n)
+        h52  = safe(float(h.rolling(w).max().iloc[-1]), p)
+        l52  = safe(float(lo.rolling(w).min().iloc[-1]), p)
+        pct_from_h52 = (p / h52 - 1) * 100 if h52 > 0 else 0
+        pct_from_l52 = (p / l52 - 1) * 100 if l52 > 0 else 0
 
-    # ── Pivot Points (CPR) ──────────────────────────────────
-    ph  = safe(h.iloc[-2],  p)
-    pl2 = safe(lo.iloc[-2], p)
-    pc2 = safe(c.iloc[-2],  p)
-    pvt = (ph + pl2 + pc2) / 3
-    rng = ph - pl2
-    r1  = 2 * pvt - pl2;  r2 = pvt + rng;  r3 = ph + 2*(pvt - pl2)
-    s1  = 2 * pvt - ph;   s2 = pvt - rng;  s3 = pl2 - 2*(ph - pvt)
-    cpr_top = (ph + pl2) / 2
-    cpr_bot = pvt
-    cpr_w   = abs(cpr_top - cpr_bot)   # CPR width (narrow = breakout prone)
+        # ── Pivot / CPR ──────────────────────────────────────────
+        ph  = safe(float(h.iloc[-2]),  p)
+        pl2 = safe(float(lo.iloc[-2]), p)
+        pc2 = safe(float(c.iloc[-2]),  p)
+        pvt = (ph + pl2 + pc2) / 3
+        rng = ph - pl2
+        r1  = 2*pvt - pl2;  r2 = pvt + rng;  r3 = ph + 2*(pvt - pl2)
+        s1  = 2*pvt - ph;   s2 = pvt - rng;  s3 = pl2 - 2*(ph - pvt)
+        cpr_top = (ph + pl2) / 2
+        cpr_bot = pvt
+        cpr_w   = abs(cpr_top - cpr_bot)
 
-    # ── Change ──────────────────────────────────────────────
-    chg   = safe((p / float(c.iloc[-2]) - 1) * 100) if n > 1 else 0
-    chg5  = safe((p / float(c.iloc[-6]) - 1) * 100) if n > 5 else 0
-    chg20 = safe((p / float(c.iloc[-21])- 1) * 100) if n > 20 else 0
+        # ── Change ──────────────────────────────────────────────
+        chg   = safe((p / float(c.iloc[-2])  - 1) * 100) if n > 1  else 0
+        chg5  = safe((p / float(c.iloc[-6])  - 1) * 100) if n > 5  else 0
+        chg20 = safe((p / float(c.iloc[-21]) - 1) * 100) if n > 20 else 0
 
-    # ── Trend Strength ──────────────────────────────────────
-    # ราคาเทียบ EMA ต่างๆ
-    above_ema9   = p > ema9
-    above_ema20  = p > ema20
-    above_ema50  = p > ema50
-    above_ema200 = p > ema200
-    golden_cross = ema50 > ema200    # Golden/Death cross
-    trend_score  = sum([above_ema9, above_ema20, above_ema50, above_ema200])  # 0-4
+        # ── Trend ────────────────────────────────────────────────
+        above_ema9   = p > ema9
+        above_ema20  = p > ema20_
+        above_ema50  = p > ema50_
+        above_ema200 = p > ema200_
+        golden_cross = ema50_ > ema200_
+        trend_score  = sum([above_ema9, above_ema20, above_ema50, above_ema200])
 
-    return dict(
-        # ── ราคา ──
-        price=p, chg=chg, chg5=chg5, chg20=chg20,
-        # ── Moving Averages ──
-        sma5=sma5, sma10=sma10, sma20=sma20, sma50=sma50, sma200=sma200,
-        ema9=ema9, ema20=ema20, ema50=ema50, ema200=ema200,
-        # ── MACD ──
-        macd=macd_hist, macd_line=macd_line, macd_signal=macd_signal,
-        # ── RSI ──
-        rsi=rsi, rsi6=rsi6,
-        # ── Bollinger Bands ──
-        bb_pct=bb_pct, bb_up=bb_up, bb_dn=bb_dn, bb_mid=bb_mid, bb_w=bb_w,
-        # ── Stochastic ──
-        stoch=stochK, stochD=stochD,
-        # ── Volatility ──
-        atr=atr, atr7=atr7,
-        # ── ADX ──
-        adx=adx, dip=dip, dim=dim,
-        # ── Oscillators ──
-        cci=cci, willr=willr, mfi=mfi, roc10=roc10, roc20=roc20,
-        # ── Volume ──
-        vwap=vwap, vol_r=vol_r, vol_r5=vol_r5, obv=obv, obv_trend=obv_trend,
-        # ── Price Range ──
-        h52=h52, l52=l52, pct_from_h52=pct_from_h52, pct_from_l52=pct_from_l52,
-        # ── Pivot / CPR ──
-        pivot=pvt, r1=r1, r2=r2, r3=r3, s1=s1, s2=s2, s3=s3,
-        cpr_top=cpr_top, cpr_bot=cpr_bot, cpr_w=cpr_w,
-        # ── Trend ──
-        golden_cross=golden_cross, trend_score=trend_score,
-        above_ema9=above_ema9, above_ema20=above_ema20,
-        above_ema50=above_ema50, above_ema200=above_ema200,
-    )
+        return dict(
+            price=p, chg=chg, chg5=chg5, chg20=chg20,
+            sma5=sma5, sma10=sma10, sma20=sma20, sma50=sma50, sma200=sma200,
+            ema9=ema9, ema20=ema20_, ema50=ema50_, ema200=ema200_,
+            macd=macd_hist, macd_line=macd_line, macd_signal=macd_signal,
+            rsi=rsi, rsi6=rsi6,
+            bb_pct=bb_pct, bb_up=bb_up, bb_dn=bb_dn, bb_mid=bb_mid, bb_w=bb_w,
+            stoch=stochK, stochD=stochD,
+            atr=atr, atr7=atr7,
+            adx=adx, dip=dip, dim=dim,
+            cci=cci, willr=willr, mfi=mfi, roc10=roc10, roc20=roc20,
+            vwap=vwap, vol_r=vol_r, vol_r5=vol_r5, obv=obv, obv_trend=obv_trend,
+            h52=h52, l52=l52, pct_from_h52=pct_from_h52, pct_from_l52=pct_from_l52,
+            pivot=pvt, r1=r1, r2=r2, r3=r3, s1=s1, s2=s2, s3=s3,
+            cpr_top=cpr_top, cpr_bot=cpr_bot, cpr_w=cpr_w,
+            golden_cross=golden_cross, trend_score=trend_score,
+            above_ema9=above_ema9, above_ema20=above_ema20,
+            above_ema50=above_ema50, above_ema200=above_ema200,
+        )
+    except Exception as e:
+        return {}
 
 
-# ── Scoring ───────────────────────────────────────────────────
 def score(I, os=35, ob=65):
     """คำนวณคะแนน 0-100 จาก indicators ครบทุกตัว"""
     if not I: return {}
@@ -735,19 +740,34 @@ def st_candles(sym, mkt_api, limit=365):
         )
 
     df = pd.DataFrame(data)
+
+    # Flatten MultiIndex columns ถ้ามี (เช่น ('close','ADVANC') → 'close')
+    if isinstance(df.columns, pd.MultiIndex):
+        df.columns = [c[0].lower() if isinstance(c, tuple) else str(c).lower()
+                      for c in df.columns]
+    else:
+        df.columns = [str(c).lower() for c in df.columns]
+
+    # Rename columns ให้เป็น OHLCV มาตรฐาน
     rename = {}
     for col in df.columns:
-        cl = col.lower()
-        if any(x in cl for x in ["close", "last"]): rename[col] = "close"
-        elif "open" in cl or cl == "o":              rename[col] = "open"
-        elif "high" in cl or cl == "h":              rename[col] = "high"
-        elif "low"  in cl or cl == "l":              rename[col] = "low"
-        elif "vol"  in cl or cl == "v":              rename[col] = "volume"
+        cl = col.lower().strip()
+        if any(x in cl for x in ["close", "last", "price"]):
+            if "close" not in rename.values(): rename[col] = "close"
+        elif cl in ["open", "o"]:   rename[col] = "open"
+        elif cl in ["high", "h"]:   rename[col] = "high"
+        elif cl in ["low",  "l"]:   rename[col] = "low"
+        elif any(x in cl for x in ["vol", "volume"]) or cl == "v":
+            rename[col] = "volume"
     df = df.rename(columns=rename)
-    for c in ["open", "high", "low", "close", "volume"]:
-        if c not in df.columns:
-            df[c] = 0
-    return df[["open","high","low","close","volume"]].apply(pd.to_numeric, errors="coerce").dropna()
+    for col in ["open", "high", "low", "close", "volume"]:
+        if col not in df.columns:
+            df[col] = 0
+    df = df[["open","high","low","close","volume"]]
+    df = df.apply(pd.to_numeric, errors="coerce")
+    df = df.dropna(subset=["close"])
+    df = df.reset_index(drop=True)
+    return df
 
 
 def st_quote(sym, rt_api):

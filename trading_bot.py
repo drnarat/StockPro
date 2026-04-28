@@ -1090,31 +1090,59 @@ if not st.session_state.get("st_ok"):
                                 app_code=lg_code.strip() if lg_code.strip() else "SANDBOX",
                                 broker_id=lg_brok.strip() if lg_brok.strip() else "SANDBOX",
                             )
-                            # Detect API version
-                            mkt_api = rt_api = None
+                            # ── Detect API version ──────────────────────────────
+                            # inv.Equity(account_no) = Trading API เท่านั้น (order/portfolio)
+                            # inv.MarketData()        = Market Data API (candlestick/price)
+                            mkt_api    = None  # Market Data — ดึงราคา/แท่งเทียน
+                            equity_api = None  # Trading — portfolio/order
+                            rt_api     = None  # Realtime streaming
+
+                            # 1. Market Data API — ลองตามลำดับ
+                            for _attr in ['MarketData', 'Market', 'market_data', 'market']:
+                                if hasattr(inv, _attr):
+                                    try:
+                                        mkt_api = getattr(inv, _attr)()
+                                        break
+                                    except Exception:
+                                        pass
+
+                            # 2. Trading/Equity API — ต้องการ account_no
+                            _acct = lg_acct.strip()
                             if hasattr(inv, 'Equity'):
-                                try:    mkt_api = inv.Equity(lg_acct.strip()) if lg_acct.strip() else inv.Equity("")
-                                except TypeError: mkt_api = inv.Equity()
-                            elif hasattr(inv, 'MarketData'):
-                                mkt_api = inv.MarketData()
-                            elif hasattr(inv, 'Market'):
-                                mkt_api = inv.Market()
-    
-                            if hasattr(inv, 'RealtimeDataConnection'):
-                                try:    rt_api = inv.RealtimeDataConnection()
-                                except Exception: rt_api = None
-                            elif hasattr(inv, 'Realtime'):
-                                try:    rt_api = inv.Realtime()
-                                except Exception: rt_api = None
-    
+                                try:
+                                    equity_api = inv.Equity(_acct) if _acct else inv.Equity("")
+                                except TypeError:
+                                    try: equity_api = inv.Equity()
+                                    except Exception: pass
+
+                            # 3. Realtime API
+                            for _rattr in ['RealtimeDataConnection', 'Realtime', 'realtime']:
+                                if hasattr(inv, _rattr):
+                                    try:
+                                        rt_api = getattr(inv, _rattr)()
+                                        break
+                                    except Exception:
+                                        pass
+
+                            # ถ้าหา MarketData ไม่ได้เลย ลองใช้ MarketData จาก inv โดยตรง
                             if mkt_api is None:
                                 avail = [a for a in dir(inv) if not a.startswith('_')]
-                                raise AttributeError(f"ไม่พบ Market API\nattributes: {avail}")
-    
+                                raise AttributeError(
+                                    f"ไม่พบ MarketData API\n"
+                                    f"Investor attributes: {avail}\n"
+                                    f"หมายเหตุ: Equity() ใช้สำหรับ trading เท่านั้น ไม่มี market data"
+                                )
+
                             st.session_state.update(
-                                st_ok=True, st_mkt=mkt_api, st_rt=rt_api, st_inv=inv,
-                                setup_done=True, account_no=lg_acct.strip(),
-                                app_id_saved="", app_secret_saved="",
+                                st_ok=True,
+                                st_mkt=mkt_api,        # MarketData API
+                                st_equity=equity_api,  # Trading API
+                                st_rt=rt_api,
+                                st_inv=inv,
+                                setup_done=True,
+                                account_no=lg_acct.strip(),
+                                app_id_saved="",
+                                app_secret_saved="",
                             )
                             st.success("✅ เชื่อมต่อสำเร็จ!")
                             st.rerun()

@@ -712,24 +712,55 @@ def st_candles(sym, mkt_api, limit=365):
     errors   = []
     data     = None
 
-    attempts = [
-        ('get_candlestick',           lambda: mkt_api.get_candlestick(sym, interval="1d", limit=limit)),
-        ('get_price_chart_by_period',  lambda: mkt_api.get_price_chart_by_period(sym, "1D")),
-        ('get_quotation_range',        lambda: mkt_api.get_quotation_range(sym, start_dt, end_dt)),
-        ('get_historical_price',       lambda: mkt_api.get_historical_price(sym, start_dt, end_dt)),
-        ('get_price',                  lambda: mkt_api.get_price(sym)),
+    # ลอง get_candlestick ด้วย parameter หลายแบบ
+    candlestick_attempts = [
+        lambda: mkt_api.get_candlestick(sym, interval="1D", limit=limit),
+        lambda: mkt_api.get_candlestick(sym, interval="1d", limit=limit),
+        lambda: mkt_api.get_candlestick(sym, "1D", limit),
+        lambda: mkt_api.get_candlestick(sym, "1d", limit),
+        lambda: mkt_api.get_candlestick(sym),
     ]
-    for method_name, call in attempts:
-        if hasattr(mkt_api, method_name):
+    if hasattr(mkt_api, 'get_candlestick'):
+        for i, call in enumerate(candlestick_attempts):
             try:
                 data = call()
                 if data:
                     break
-                errors.append(f"{method_name}: returned empty")
+                errors.append(f"get_candlestick[{i}]: returned empty")
             except Exception as e:
-                errors.append(f"{method_name}: {e}")
-        else:
-            errors.append(f"{method_name}: not found")
+                err_str = str(e)
+                errors.append(f"get_candlestick[{i}]: {err_str}")
+                # ถ้า token หมดอายุ หยุดเลย
+                if any(x in err_str.lower() for x in
+                       ['token', 'expired', 'unauthorized', '401', 'invalid']):
+                    raise RuntimeError(
+                        f"Token หมดอายุหรือไม่ถูกต้อง\n"
+                        f"กรุณากด 'ออกจากระบบ' แล้ว Login ใหม่\n"
+                        f"(Error: {err_str})"
+                    )
+    else:
+        errors.append("get_candlestick: not found")
+
+    # ลอง methods อื่น
+    other_attempts = [
+        ('get_price_chart_by_period',  lambda: mkt_api.get_price_chart_by_period(sym, "1D")),
+        ('get_price_chart_by_period',  lambda: mkt_api.get_price_chart_by_period(sym, "1d")),
+        ('get_quotation_range',        lambda: mkt_api.get_quotation_range(sym, start_dt, end_dt)),
+        ('get_historical_price',       lambda: mkt_api.get_historical_price(sym, start_dt, end_dt)),
+        ('get_price',                  lambda: mkt_api.get_price(sym)),
+    ]
+    if data is None:
+        for method_name, call in other_attempts:
+            if hasattr(mkt_api, method_name):
+                try:
+                    data = call()
+                    if data:
+                        break
+                    errors.append(f"{method_name}: returned empty")
+                except Exception as e:
+                    errors.append(f"{method_name}: {e}")
+            else:
+                errors.append(f"{method_name}: not found")
 
     if not data:
         all_methods = [m for m in dir(mkt_api) if not m.startswith('_')]

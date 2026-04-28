@@ -1181,11 +1181,15 @@ with t1:
     with st.expander("⚙️ Parameters & คำแนะนำการสแกน", expanded=False):
         pc1, pc2 = st.columns(2)
         with pc1:
-            rsi_os = st.slider("RSI Oversold",   15, 45, st.session_state.get("p_rsi_os",35), key="p_rsi_os")
-            min_sc = st.slider("คะแนนขั้นต่ำ",  0, 100, st.session_state.get("p_min_sc",55), key="p_min_sc")
+            rsi_os = st.slider("RSI Oversold",   15, 45,
+                int(st.session_state.get("_rsi_os_val", 35)), key="p_rsi_os")
+            min_sc = st.slider("คะแนนขั้นต่ำ",  0, 100,
+                int(st.session_state.get("_min_sc_val", 55)), key="p_min_sc")
         with pc2:
-            rsi_ob = st.slider("RSI Overbought", 55, 85, st.session_state.get("p_rsi_ob",65), key="p_rsi_ob")
-            min_rr = st.slider("R/R ขั้นต่ำ",   0.5, 3.0, float(st.session_state.get("p_min_rr",1.2)), step=0.1, key="p_min_rr")
+            rsi_ob = st.slider("RSI Overbought", 55, 85,
+                int(st.session_state.get("_rsi_ob_val", 65)), key="p_rsi_ob")
+            min_rr = st.slider("R/R ขั้นต่ำ",   0.5, 3.0,
+                float(st.session_state.get("_min_rr_val", 1.2)), step=0.1, key="p_min_rr")
 
         st.markdown("---")
         st.markdown("**💡 Preset — เลือกรูปแบบตลาดเพื่อ Auto-fill ค่า**")
@@ -1198,10 +1202,11 @@ with t1:
         tp3.metric("คะแนนขั้นต่ำ", tip["p_min_sc"])
         tp4.metric("R/R ขั้นต่ำ",  tip["p_min_rr"])
         if st.button("✅ ใช้ Preset นี้", key="apply_tip"):
-            st.session_state["p_rsi_os"] = tip["p_rsi_os"]
-            st.session_state["p_rsi_ob"] = tip["p_rsi_ob"]
-            st.session_state["p_min_sc"] = tip["p_min_sc"]
-            st.session_state["p_min_rr"] = tip["p_min_rr"]
+            # ใช้ _val keys แทน widget keys โดยตรง
+            st.session_state["_rsi_os_val"] = tip["p_rsi_os"]
+            st.session_state["_rsi_ob_val"] = tip["p_rsi_ob"]
+            st.session_state["_min_sc_val"] = tip["p_min_sc"]
+            st.session_state["_min_rr_val"] = tip["p_min_rr"]
             st.success(f"✅ Applied preset: {tip_mode}")
             st.rerun()
 

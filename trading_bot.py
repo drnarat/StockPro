@@ -712,32 +712,62 @@ def st_candles(sym, mkt_api, limit=365):
     errors   = []
     data     = None
 
-    # ลอง get_candlestick ด้วย parameter หลายแบบ
-    candlestick_attempts = [
-        lambda: mkt_api.get_candlestick(sym, interval="1D", limit=limit),
-        lambda: mkt_api.get_candlestick(sym, interval="1d", limit=limit),
-        lambda: mkt_api.get_candlestick(sym, "1D", limit),
-        lambda: mkt_api.get_candlestick(sym, "1d", limit),
-        lambda: mkt_api.get_candlestick(sym),
-    ]
+    # get_candlestick ต้องการ Interval enum — ค้นหาจาก settrade_v2 ใน runtime
+    _interval_enum = None
+    _interval_vals = []
+    try:
+        import importlib, pkgutil, settrade_v2 as _stv2, os
+        _pkg_path = os.path.dirname(_stv2.__file__)
+        # ค้นหา Interval class ใน package
+        for _root, _dirs, _files in os.walk(_pkg_path):
+            for _fn in _files:
+                if not _fn.endswith('.py'): continue
+                try:
+                    _fp = os.path.join(_root, _fn)
+                    _rel = os.path.relpath(_fp, os.path.dirname(_pkg_path))
+                    _mod_name = _rel.replace(os.sep, '.')[:-3]
+                    _mod = importlib.import_module(_mod_name)
+                    if hasattr(_mod, 'Interval'):
+                        _interval_enum = _mod.Interval
+                        _interval_vals = [v for v in _interval_enum]
+                        break
+                except Exception:
+                    pass
+            if _interval_enum: break
+    except Exception:
+        pass
+
     if hasattr(mkt_api, 'get_candlestick'):
-        for i, call in enumerate(candlestick_attempts):
+        # สร้าง attempts จาก enum values ก่อน
+        _attempts = []
+        for _v in _interval_vals:
+            _attempts.append((f"Interval.{_v.name}", _v))
+        # แล้วค่อย fallback string
+        for _s in ["D", "DAY", "DAILY", "day", "1day", "1DAY", "W", "M"]:
+            _attempts.append((_s, _s))
+        # และ no-interval
+        _attempts.append(("no_interval", None))
+
+        for _fmt, _iv in _attempts:
             try:
-                data = call()
+                if _iv is None:
+                    data = mkt_api.get_candlestick(sym, limit=limit)
+                else:
+                    data = mkt_api.get_candlestick(sym, interval=_iv, limit=limit)
                 if data:
+                    errors.append(f"Success: interval='{_fmt}'")
                     break
-                errors.append(f"get_candlestick[{i}]: returned empty")
-            except Exception as e:
-                err_str = str(e)
-                errors.append(f"get_candlestick[{i}]: {err_str}")
-                # ถ้า token หมดอายุ หยุดเลย
-                if any(x in err_str.lower() for x in
-                       ['token', 'expired', 'unauthorized', '401', 'invalid']):
-                    raise RuntimeError(
-                        f"Token หมดอายุหรือไม่ถูกต้อง\n"
-                        f"กรุณากด 'ออกจากระบบ' แล้ว Login ใหม่\n"
-                        f"(Error: {err_str})"
-                    )
+                errors.append(f"[{_fmt}]: empty")
+            except Exception as _e:
+                _es = str(_e)
+                # interval format ผิด → ลอง format ถัดไป
+                if any(x in _es for x in ['Invalid String', 'ConversionFailed',
+                                           'IllegalArgument', 'Interval']):
+                    errors.append(f"[{_fmt}]: bad format")
+                    continue
+                # error อื่น (network, auth, etc.)
+                errors.append(f"[{_fmt}]: {_es[:120]}")
+                break
     else:
         errors.append("get_candlestick: not found")
 
@@ -765,8 +795,12 @@ def st_candles(sym, mkt_api, limit=365):
     if not data:
         all_methods = [m for m in dir(mkt_api) if not m.startswith('_')]
         err_str = '; '.join(errors)
-        # ตรวจว่า token หมดอายุไหม
-        if 'access token' in err_str.lower() or 'expired' in err_str.lower() or 'invalid' in err_str.lower():
+        # ตรวจว่า token หมดอายุไหม (ไม่ให้ match กับ Invalid String interval error)
+        _is_interval_err = any(x in err_str for x in
+            ['Invalid String', 'ConversionFailed', 'IllegalArgument', 'dto.Interval'])
+        _is_token_err = (not _is_interval_err and any(x in err_str.lower() for x in
+            ['access token', 'expired', 'unauthorized', '401 client']))
+        if _is_token_err:
             raise RuntimeError(
                 f"Token หมดอายุ — กรุณากด 'ออกจากระบบ' แล้ว Login ใหม่\n"
                 f"(Error: {err_str[:100]})"

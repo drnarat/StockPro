@@ -1,5 +1,5 @@
-settrade-v2
+streamlit
+requests
 pandas
-pandas-ta
-google-generativeai
-plotly
+numpy
+yfinance

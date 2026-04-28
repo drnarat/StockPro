@@ -733,10 +733,17 @@ def st_candles(sym, mkt_api, limit=365):
 
     if not data:
         all_methods = [m for m in dir(mkt_api) if not m.startswith('_')]
+        err_str = '; '.join(errors)
+        # ตรวจว่า token หมดอายุไหม
+        if 'access token' in err_str.lower() or 'expired' in err_str.lower() or 'invalid' in err_str.lower():
+            raise RuntimeError(
+                f"Token หมดอายุ — กรุณากด 'ออกจากระบบ' แล้ว Login ใหม่\n"
+                f"(Error: {err_str[:100]})"
+            )
         raise RuntimeError(
             f"ไม่สามารถดึงข้อมูล {sym} ได้\n"
             f"Methods ที่มี: {all_methods}\n"
-            f"Errors: {'; '.join(errors)}"
+            f"Errors: {err_str}"
         )
 
     df = pd.DataFrame(data)
@@ -1111,31 +1118,40 @@ if not st.session_state.get("st_ok"):
                                 broker_id=lg_brok.strip() if lg_brok.strip() else "SANDBOX",
                             )
                             # ── Detect API version ──────────────────────────────
-                            # inv.Equity(account_no) = Trading API เท่านั้น (order/portfolio)
-                            # inv.MarketData()        = Market Data API (candlestick/price)
-                            mkt_api    = None  # Market Data — ดึงราคา/แท่งเทียน
-                            equity_api = None  # Trading — portfolio/order
+                            # Equity(account_no) มี get_candlestick + get_quote_symbol
+                            # ใช้ได้ทั้ง market data และ trading
+                            _acct  = lg_acct.strip()
+                            mkt_api    = None  # ใช้ดึงราคา/แท่งเทียน
+                            equity_api = None  # ใช้ดู portfolio/order
                             rt_api     = None  # Realtime streaming
 
-                            # 1. Market Data API — ลองตามลำดับ
-                            for _attr in ['MarketData', 'Market', 'market_data', 'market']:
-                                if hasattr(inv, _attr):
-                                    try:
-                                        mkt_api = getattr(inv, _attr)()
-                                        break
-                                    except Exception:
-                                        pass
-
-                            # 2. Trading/Equity API — ต้องการ account_no
-                            _acct = lg_acct.strip()
+                            # Equity API — มี get_candlestick อยู่
                             if hasattr(inv, 'Equity'):
                                 try:
                                     equity_api = inv.Equity(_acct) if _acct else inv.Equity("")
+                                    mkt_api    = equity_api  # ใช้อันเดียวกัน
                                 except TypeError:
-                                    try: equity_api = inv.Equity()
+                                    try:
+                                        equity_api = inv.Equity()
+                                        mkt_api    = equity_api
                                     except Exception: pass
+                                except Exception: pass
 
-                            # 3. Realtime API
+                            # ถ้า Equity ไม่มี ลอง MarketData / Market
+                            if mkt_api is None:
+                                for _attr in ['MarketData', 'Market', 'market_data', 'market']:
+                                    if hasattr(inv, _attr):
+                                        try:
+                                            mkt_api = getattr(inv, _attr)(_acct) if _acct else getattr(inv, _attr)()
+                                            break
+                                        except Exception:
+                                            try:
+                                                mkt_api = getattr(inv, _attr)()
+                                                break
+                                            except Exception:
+                                                pass
+
+                            # Realtime API
                             for _rattr in ['RealtimeDataConnection', 'Realtime', 'realtime']:
                                 if hasattr(inv, _rattr):
                                     try:
@@ -1144,14 +1160,9 @@ if not st.session_state.get("st_ok"):
                                     except Exception:
                                         pass
 
-                            # ถ้าหา MarketData ไม่ได้เลย ลองใช้ MarketData จาก inv โดยตรง
                             if mkt_api is None:
                                 avail = [a for a in dir(inv) if not a.startswith('_')]
-                                raise AttributeError(
-                                    f"ไม่พบ MarketData API\n"
-                                    f"Investor attributes: {avail}\n"
-                                    f"หมายเหตุ: Equity() ใช้สำหรับ trading เท่านั้น ไม่มี market data"
-                                )
+                                raise AttributeError(f"ไม่พบ Market API\nattributes: {avail}")
 
                             st.session_state.update(
                                 st_ok=True,

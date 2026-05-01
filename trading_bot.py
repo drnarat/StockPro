@@ -1142,13 +1142,6 @@ if not st.session_state.get("st_ok"):
           </div>
         </div>
         """, unsafe_allow_html=True)
-        st.markdown("""
-        <div style="text-align:center;padding:10px 0 20px">
-          <div style="font-size:16px;color:#818cf8;font-weight:500">
-            🔐 กรอก Settrade API Credential เพื่อเริ่มใช้งาน
-          </div>
-        </div>
-        """, unsafe_allow_html=True)
     
         with st.form("login_gate"):
             lg1, lg2 = st.columns(2)
